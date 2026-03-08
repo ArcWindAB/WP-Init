@@ -1,0 +1,52 @@
+name: Build WordPress plugin release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set variables
+        run: |
+          echo "PLUGIN_SLUG=arcwind-init" >> $GITHUB_ENV
+          echo "MAIN_FILE=arcwind-init.php" >> $GITHUB_ENV
+          echo "BUILD_DIR=build/arcwind-init" >> $GITHUB_ENV
+          echo "ZIP_PATH=build/arcwind-init.zip" >> $GITHUB_ENV
+
+      - name: Prepare build directory
+        run: |
+          rm -rf build
+          mkdir -p "$BUILD_DIR"
+
+      - name: Copy plugin files
+        run: |
+          rsync -av ./ "$BUILD_DIR"/ \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "build" \
+            --exclude ".gitignore" \
+            --exclude ".DS_Store"
+
+      - name: Verify main plugin file exists
+        run: |
+          test -f "$BUILD_DIR/$MAIN_FILE"
+
+      - name: Create zip package
+        run: |
+          cd build
+          zip -r "$(basename "$ZIP_PATH")" "$(basename "$BUILD_DIR")"
+
+      - name: Upload zip to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" "$ZIP_PATH" --clobber
