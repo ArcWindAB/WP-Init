@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: Initierar PostHog (EU som standard) och lägger till en enkel dashboard-widget “Statistik” (aktiva användare & sidvisningar) samt en feedback-widget. Inkluderar felspårning.
- * Version:     1.5.2
+ * Version:     1.6.0
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init
@@ -550,10 +550,9 @@ posthog.init('<?php echo esc_js($public_api_key); ?>', {
         </script>
         <!-- /PostHog spårning -->
         <?php
-    }
-
-    
+    }   
 }
+
 class ArcWind_Init_GitHub_Updater {
     const GITHUB_REPO = 'ArcWindAB/WP-Init';
     const CACHE_KEY   = 'arcwind_init_github_release';
@@ -586,7 +585,7 @@ class ArcWind_Init_GitHub_Updater {
         }
 
         $release = $this->get_latest_release();
-        if (empty($release) || empty($release['version'])) {
+        if (empty($release) || empty($release['version']) || empty($release['package'])) {
             return false;
         }
 
@@ -594,23 +593,14 @@ class ArcWind_Init_GitHub_Updater {
             return false;
         }
 
-        if (empty($release['package'])) {
-            return false;
-        }
-
         return [
-            'id'            => 'https://github.com/' . self::GITHUB_REPO,
-            'slug'          => $this->plugin_slug,
-            'plugin'        => $this->plugin_basename,
-            'new_version'   => $release['version'],
-            'url'           => 'https://github.com/' . self::GITHUB_REPO,
-            'package'       => $release['package'],
-            'icons'         => [],
-            'banners'       => [],
-            'banners_rtl'   => [],
-            'tested'        => '',
-            'requires_php'  => '',
-            'compatibility' => new stdClass(),
+            'id'          => 'https://github.com/' . self::GITHUB_REPO,
+            'slug'        => $this->plugin_slug,
+            'version'     => $release['version'],
+            'url'         => 'https://github.com/' . self::GITHUB_REPO,
+            'package'     => $release['package'],
+            'tested'      => '',
+            'requires_php'=> '',
         ];
     }
 
@@ -737,5 +727,4 @@ class ArcWind_Init_GitHub_Updater {
 }
 
 new ArcWind_Init();
-
 new ArcWind_Init_GitHub_Updater(__FILE__);
