@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: Initierar PostHog (EU som standard) och lägger till en enkel dashboard-widget “Statistik” (aktiva användare & sidvisningar) samt en feedback-widget. Inkluderar felspårning.
- * Version:     1.6.0
+ * Version:     1.6.1
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init
@@ -10,6 +10,7 @@
  */
 
 if (!defined('ABSPATH')) exit;
+require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-tracker.php';
 
 class ArcWind_Init {
     const OPTION_KEY    = 'arcwind_init_settings';
@@ -17,7 +18,15 @@ class ArcWind_Init {
     const ERR_TRANSIENT = 'arcwind_init_last_errors';
     const ERR_TTL       = 30 * MINUTE_IN_SECONDS;
 
-    public function __construct() {
+    private static $version = '0.0.0';
+
+    public function __construct() {        
+        $plugin_data = get_file_data(__FILE__, [
+            'Version' => 'Version',
+        ], 'plugin');
+
+        self::$version = isset($plugin_data['Version']) ? $plugin_data['Version'] : '0.0.0';
+
         // Settings + menu
         add_action('admin_init',         [$this, 'register_settings']);
         add_action('admin_menu',         [$this, 'add_settings_page']);
@@ -33,6 +42,13 @@ class ArcWind_Init {
         add_action('wp_footer',    [$this, 'maybe_print_posthog_snippet_universal']);
         add_action('admin_head',   [$this, 'maybe_print_posthog_snippet_universal']);
         add_action('admin_footer', [$this, 'maybe_print_posthog_snippet_universal']);
+
+        add_action('wp_enqueue_scripts', [$this, 'enqueue_tracking_bridge']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_tracking_bridge']);
+    }
+
+    public static function get_version() {
+        return self::$version;
     }
 
     /* =========================
@@ -412,41 +428,24 @@ class ArcWind_Init {
 
     private function capture_error($kind, $message, $props = []) {
         $opts = get_option(self::OPTION_KEY);
-        if (empty($opts['enable_error_tracking'])) return;
-        $public_key = $opts['public_api_key'] ?? '';
-        if (empty($public_key)) return;
-        $host = rtrim($opts['host'] ?? 'https://tel.arc.vin/_p', '/');
+        if (empty($opts['enable_error_tracking'])) {
+            return;
+        }
 
-        $payload = [
-            'api_key'     => $public_key,
-            'event'       => 'arcwind_init_error',
-            'distinct_id' => $opts['error_distinct_id'] ?: 'arcwind-init:server',
-            'properties'  => array_merge([
-                'kind'       => (string)$kind,
-                'message'    => (string)$message,
-                'site_url'   => home_url('/'),
-                'plugin_ver' => '1.5.0',
-                'php'        => PHP_VERSION,
-                'wp'         => get_bloginfo('version'),
-            ], is_array($props) ? $props : []),
-        ];
+        $distinct_id = $opts['error_distinct_id'] ?: 'arcwind-init:server';
 
-        $resp = wp_remote_post($host . '/capture/', [
-            'method'  => 'POST',
-            'timeout' => 10,
-            'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
-            'body'    => wp_json_encode($payload),
-        ]);
+        ArcWind_Init_Tracker::capture('arcwind_init_error', array_merge([
+            'kind'    => (string) $kind,
+            'message' => (string) $message,
+            'php'     => PHP_VERSION,
+            'wp'      => get_bloginfo('version'),
+        ], is_array($props) ? $props : []), $distinct_id);
 
         $prev = get_transient(self::ERR_TRANSIENT);
         $prev = is_array($prev) ? $prev : [];
         $prev[] = strtoupper($kind) . ': ' . $message;
         $prev = array_slice($prev, -5);
         set_transient(self::ERR_TRANSIENT, $prev, self::ERR_TTL);
-
-        if (is_wp_error($resp)) {
-            error_log('[ArcWind Init] Error capture failed: ' . $resp->get_error_message());
-        }
     }
 
     /* =========================
@@ -551,6 +550,45 @@ posthog.init('<?php echo esc_js($public_api_key); ?>', {
         <!-- /PostHog spårning -->
         <?php
     }   
+
+    public function enqueue_tracking_bridge() {
+        $opts = get_option(self::OPTION_KEY);
+
+        if (empty($opts['enable_tracking']) || empty($opts['public_api_key'])) {
+            return;
+        }
+
+        wp_register_script(
+            'arcwind-init-tracker',
+            plugins_url('assets/js/arcwind-init-tracker.js', __FILE__),
+            [],
+            self::get_version(),
+            true
+        );
+
+        wp_enqueue_script('arcwind-init-tracker');
+
+        $user_data = null;
+        if (is_user_logged_in()) {
+            $u = wp_get_current_user();
+            $user_data = [
+                'id'    => (string) $u->ID,
+                'name'  => (string) $u->display_name,
+                'roles' => array_values((array) $u->roles),
+            ];
+        }
+
+        wp_add_inline_script(
+            'arcwind-init-tracker',
+            'window.ArcWindInitConfig = ' . wp_json_encode([
+                'version'  => self::get_version(),
+                'isAdmin'  => is_admin(),
+                'pageType' => is_admin() ? 'admin' : 'frontend',
+                'user'     => $user_data,
+            ]) . ';',
+            'before'
+        );
+    }
 }
 
 class ArcWind_Init_GitHub_Updater {
@@ -566,7 +604,11 @@ class ArcWind_Init_GitHub_Updater {
     public function __construct($plugin_file) {
         $this->plugin_file     = $plugin_file;
         $this->plugin_basename = plugin_basename($plugin_file);
-        $this->plugin_slug     = dirname($this->plugin_basename);
+
+        $this->plugin_slug = dirname($this->plugin_basename);
+        if ($this->plugin_slug === '.' || $this->plugin_slug === '/') {
+            $this->plugin_slug = basename($this->plugin_basename, '.php');
+        }
 
         $plugin_data = get_file_data($plugin_file, [
             'Version' => 'Version',
@@ -586,11 +628,11 @@ class ArcWind_Init_GitHub_Updater {
 
         $release = $this->get_latest_release();
         if (empty($release) || empty($release['version']) || empty($release['package'])) {
-            return false;
+            return $update;
         }
 
         if (version_compare($release['version'], $this->current_version, '<=')) {
-            return false;
+            return $update;
         }
 
         return [
