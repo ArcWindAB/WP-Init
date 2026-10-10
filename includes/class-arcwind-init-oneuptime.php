@@ -110,6 +110,27 @@ class ArcWind_Init_OneUptime {
         ]);
     }
 
+    /**
+     * Convert OneUptime API date values into Unix timestamps safely.
+     * The API may return ISO strings, numeric epoch values or wrapped objects.
+     */
+    public static function parse_api_timestamp($value) {
+        if (is_array($value)) {
+            foreach (['value', 'date', 'timestamp', '$date'] as $key) {
+                if (array_key_exists($key, $value)) return self::parse_api_timestamp($value[$key]);
+            }
+            return null;
+        }
+        if (is_int($value) || is_float($value)) {
+            if (!is_finite((float) $value)) return null;
+            return (int) (abs($value) >= 100000000000 ? $value / 1000 : $value);
+        }
+        if (!is_string($value) || trim($value) === '') return null;
+        if (is_numeric($value)) return self::parse_api_timestamp((float) $value);
+        $timestamp = strtotime($value);
+        return $timestamp === false ? null : $timestamp;
+    }
+
     private function active_messages() {
         $o = $this->options();
         if (!$o['enabled'] || !$o['banner_enabled'] || !$o['status_page_id'] || !$o['status_url']) return [];
@@ -141,10 +162,12 @@ class ArcWind_Init_OneUptime {
                     if (preg_match('/resolved|closed|åtgärdad|avslutad/i', (string) ($state['name'] ?? ''))) continue;
                 } elseif ($config['type'] === 'announcement') {
                     $show = $record['showAnnouncementAt'] ?? null;
-                    if ($show && strtotime($show) > time()) continue;
+                    $show_at = self::parse_api_timestamp($show);
+                    if ($show_at !== null && $show_at > time()) continue;
                 } else {
                     $end = $record['endsAt'] ?? $record['scheduledEndAt'] ?? null;
-                    if ($end && strtotime($end) < time()) continue;
+                    $end_at = self::parse_api_timestamp($end);
+                    if ($end_at !== null && $end_at < time()) continue;
                     $state = $record['currentScheduledMaintenanceState'] ?? [];
                     if (is_array($state) && (!empty($state['isCompletedState']) || !empty($state['isCanceledState']))) continue;
                 }
