@@ -292,7 +292,7 @@ Gå till **Inställningar → ArcWind Init → OneUptime**.
 
 - Aktivera OneUptime och ange adressen till din **publika** statussida (t.ex. `https://status.example.com`).
 - Ange statussidans **Status Page ID** (från OneUptime) eller verifierade domän.
-- Aktivera incidentbannern för att visa öppna incidenter på webbplatsens frontend. Incidenter hämtas server-side via `/status-page-api/incidents/{id}` och cachelagras i 60 sekunder. Inga API-nycklar behövs för en publik statussida.
+- Aktivera informationsbannern och välj separat om du vill visa **incidenter**, **Announcements** och **planerade underhåll**. Uppgifter hämtas från respektive publikt status-API och cachelagras i 60 sekunder. Inga API-nycklar behövs för en publik statussida.
 - Skapa en **Incoming Request**-monitor i OneUptime, kopiera den hemliga `https://oneuptime.example.com/heartbeat/SECRET`-adressen och aktivera heartbeat.
 - Heartbeat skickas från servern varje minut så länge OneUptime och heartbeat är aktiverade.
 
@@ -303,3 +303,5 @@ Heartbeat-URL:en innehåller en hemlighet. Dela den inte offentligt eller i fels
 ## Inställningsflikar
 
 Inställningarna är uppdelade i **PostHog**, **Feedback** och **OneUptime**. Befintliga PostHog-inställningar och feedback-UUID behålls vid uppdateringen. PostHog-spårning och feedback-widgeten kan aktiveras eller stängas av separat.
+
+Bannern använder rött för incidenter, blått för Announcements och gult för planerade underhåll. Högst tio meddelanden visas samtidigt. Endast publicerade Announcements visas; framtida publiceringstider filtreras bort.
