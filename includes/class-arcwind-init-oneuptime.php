@@ -23,7 +23,8 @@ class ArcWind_Init_OneUptime {
         return wp_parse_args((array) get_option(self::KEY, []), [
             'enabled' => 0, 'status_url' => '', 'status_page_id' => '',
             'heartbeat_enabled' => 0, 'heartbeat_url' => '',
-            'banner_enabled' => 1,
+            'banner_enabled' => 1, 'show_incidents' => 1,
+            'show_announcements' => 1, 'show_maintenance' => 1,
         ]);
     }
 
@@ -40,7 +41,10 @@ class ArcWind_Init_OneUptime {
             'enabled' => ['Aktivera OneUptime', 'checkbox'],
             'status_url' => ['Publik statussida (URL)', 'url'],
             'status_page_id' => ['Status Page ID (eller domän)', 'text'],
-            'banner_enabled' => ['Visa incidentbanner', 'checkbox'],
+            'banner_enabled' => ['Visa informationsbanner', 'checkbox'],
+            'show_incidents' => ['Visa incidenter', 'checkbox'],
+            'show_announcements' => ['Visa meddelanden (Announcements)', 'checkbox'],
+            'show_maintenance' => ['Visa planerade underhåll', 'checkbox'],
             'heartbeat_enabled' => ['Aktivera heartbeat', 'checkbox'],
             'heartbeat_url' => ['Heartbeat-URL (hemlig)', 'password'],
         ] as $key => $definition) {
@@ -61,7 +65,7 @@ class ArcWind_Init_OneUptime {
     public function sanitize($raw) {
         $raw = is_array($raw) ? $raw : [];
         $out = [];
-        foreach (['enabled', 'banner_enabled', 'heartbeat_enabled'] as $key) {
+        foreach (['enabled', 'banner_enabled', 'show_incidents', 'show_announcements', 'show_maintenance', 'heartbeat_enabled'] as $key) {
             $out[$key] = empty($raw[$key]) ? 0 : 1;
         }
         $out['status_page_id'] = sanitize_text_field($raw['status_page_id'] ?? '');
@@ -106,49 +110,76 @@ class ArcWind_Init_OneUptime {
         ]);
     }
 
-    private function active_incident() {
+    private function active_messages() {
         $o = $this->options();
-        if (!$o['enabled'] || !$o['banner_enabled'] || !$o['status_page_id'] || !$o['status_url']) return null;
+        if (!$o['enabled'] || !$o['banner_enabled'] || !$o['status_page_id'] || !$o['status_url']) return [];
         $cached = get_transient(self::CACHE);
-        if ($cached !== false) return $cached === 'none' ? null : $cached;
-        $base = untrailingslashit($o['status_url']);
-        $parsed = wp_parse_url($base);
-        if (!$parsed || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host'])) return null;
-        $api_url = 'https://' . $parsed['host'] . '/status-page-api/incidents/' . rawurlencode($o['status_page_id']);
-        $response = wp_safe_remote_get($api_url, ['timeout' => 5, 'redirection' => 0]);
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) return null;
-        $json = json_decode(wp_remote_retrieve_body($response), true);
-        if (!is_array($json) || !isset($json['incidents']) || !is_array($json['incidents'])) return null;
-        foreach ($json['incidents'] as $incident) {
-            $state = $incident['currentIncidentState'] ?? [];
-            if (!empty($state['isResolvedState']) || !empty($state['isClosedState'])) continue;
-            // OneUptime may also return historical incidents. Only show active states.
-            $name = strtolower((string) ($state['name'] ?? ''));
-            if (!$state || preg_match('/resolved|closed|åtgärdad|avslutad/', $name)) continue;
-            $item = ['title' => sanitize_text_field($incident['title'] ?? 'Pågående driftstörning'), 'url' => $o['status_url']];
-            set_transient(self::CACHE, $item, MINUTE_IN_SECONDS);
-            return $item;
+        if ($cached !== false && is_array($cached)) return $cached;
+        $parsed = wp_parse_url($o['status_url']);
+        if (!$parsed || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host'])) return [];
+        $base = 'https://' . $parsed['host'];
+        if (!empty($parsed['port'])) $base .= ':' . (int) $parsed['port'];
+        $api = $base . '/status-page-api/';
+        $id = rawurlencode($o['status_page_id']);
+        $messages = [];
+        $resources = [
+            'incidents' => ['enabled' => $o['show_incidents'], 'key' => 'incidents', 'type' => 'incident'],
+            'announcements' => ['enabled' => $o['show_announcements'], 'key' => 'announcements', 'type' => 'announcement'],
+            'scheduled-maintenance-events' => ['enabled' => $o['show_maintenance'], 'key' => 'scheduledMaintenanceEvents', 'type' => 'maintenance'],
+        ];
+        foreach ($resources as $endpoint => $config) {
+            if (!$config['enabled']) continue;
+            $response = wp_safe_remote_get($api . $endpoint . '/' . $id, ['timeout' => 5, 'redirection' => 0]);
+            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) continue;
+            $json = json_decode(wp_remote_retrieve_body($response), true);
+            if (!is_array($json) || !isset($json[$config['key']]) || !is_array($json[$config['key']])) continue;
+            foreach ($json[$config['key']] as $record) {
+                if (!is_array($record)) continue;
+                if ($config['type'] === 'incident') {
+                    $state = $record['currentIncidentState'] ?? [];
+                    if (!is_array($state) || !$state || !empty($state['isResolvedState']) || !empty($state['isClosedState'])) continue;
+                    if (preg_match('/resolved|closed|åtgärdad|avslutad/i', (string) ($state['name'] ?? ''))) continue;
+                } elseif ($config['type'] === 'announcement') {
+                    $show = $record['showAnnouncementAt'] ?? null;
+                    if ($show && strtotime($show) > time()) continue;
+                } else {
+                    $end = $record['endsAt'] ?? $record['scheduledEndAt'] ?? null;
+                    if ($end && strtotime($end) < time()) continue;
+                    $state = $record['currentScheduledMaintenanceState'] ?? [];
+                    if (is_array($state) && (!empty($state['isCompletedState']) || !empty($state['isCanceledState']))) continue;
+                }
+                $title = sanitize_text_field($record['title'] ?? '');
+                if (!$title) continue;
+                $messages[] = ['type' => $config['type'], 'title' => $title, 'url' => $o['status_url']];
+                if (count($messages) >= 10) break 2;
+            }
         }
-        set_transient(self::CACHE, 'none', MINUTE_IN_SECONDS);
-        return null;
+        set_transient(self::CACHE, $messages, MINUTE_IN_SECONDS);
+        return $messages;
     }
 
     public function banner_styles() {
         $o = $this->options();
         if (!$o['enabled'] || !$o['banner_enabled']) return;
-        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;background:#8b211c;color:#fff;padding:12px 20px;text-align:center;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner a{color:#fff;text-decoration:underline}</style>';
+        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner .arcwind-oneuptime-message{padding:10px 20px;text-align:center;background:#8b211c;color:#fff}#arcwind-oneuptime-banner .arcwind-oneuptime-message.announcement{background:#195b88}#arcwind-oneuptime-banner .arcwind-oneuptime-message.maintenance{background:#f4c75b;color:#181818}#arcwind-oneuptime-banner a{color:inherit;text-decoration:underline}</style>';
     }
 
     public function render_banner() {
-        $item = $this->active_incident();
-        if (!$item) return;
+        $items = $this->active_messages();
+        if (!$items) return;
+        echo '<div id="arcwind-oneuptime-banner" role="region" aria-label="Driftinformation">';
+        foreach ($items as $item) {
+            $labels = ['incident' => 'Driftstörning', 'announcement' => 'Information', 'maintenance' => 'Planerat underhåll'];
+            echo '<div class="arcwind-oneuptime-message ' . esc_attr($item['type']) . '"><strong>' . esc_html($labels[$item['type']]) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></div>';
+        }
+        echo '</div>';
         echo '<style>body.admin-bar #wpadminbar{top:44px}@media(max-width:782px){body.admin-bar #wpadminbar{top:60px}}</style>';
-        echo '<div id="arcwind-oneuptime-banner" role="status" aria-live="polite"><strong>Driftinformation:</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer på statussidan</a></div>';
     }
 
     public function render_admin_notice() {
-        $item = $this->active_incident();
-        if (!$item) return;
-        echo '<div class="notice notice-warning"><p><strong>Driftinformation:</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
+        $items = $this->active_messages();
+        foreach ($items as $item) {
+            echo '<div class="notice notice-info"><p><strong>' . esc_html(ucfirst($item['type'])) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
+        }
     }
 }
