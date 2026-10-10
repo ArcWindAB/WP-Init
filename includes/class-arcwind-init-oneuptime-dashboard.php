@@ -35,6 +35,15 @@ class ArcWind_Init_OneUptime_Dashboard {
         if (wp_remote_retrieve_response_code($res) !== 200) return new WP_Error('api_error', 'Statussidan kunde inte läsas (HTTP ' . wp_remote_retrieve_response_code($res) . ').');
         $data = json_decode(wp_remote_retrieve_body($res), true);
         if (!is_array($data) || !array_key_exists('overallStatus', $data)) return new WP_Error('invalid_response', 'OneUptime skickade ett oväntat svar.');
+        $uptime = wp_safe_remote_post($host . '/status-page-api/uptime/' . rawurlencode($options['status_page_id']), [
+            'timeout' => 8, 'redirection' => 0,
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => '{}',
+        ]);
+        if (!is_wp_error($uptime) && wp_remote_retrieve_response_code($uptime) === 200) {
+            $uptime_data = json_decode(wp_remote_retrieve_body($uptime), true);
+            if (is_array($uptime_data)) $data['_arcwindUptime'] = $uptime_data;
+        }
         set_transient(self::CACHE, $data, MINUTE_IN_SECONDS);
         return $data;
     }
@@ -78,7 +87,28 @@ class ArcWind_Init_OneUptime_Dashboard {
         echo '</ul>';
     }
 
+    private function normalize_id($id) {
+        if (is_array($id)) return (string) ($id['value'] ?? $id['_id'] ?? '');
+        return is_scalar($id) ? (string) $id : '';
+    }
+
+    private function uptime_record($resource, $data) {
+        $id = $this->normalize_id($resource['_id'] ?? $resource['id'] ?? '');
+        if (!$id) return null;
+        $uptime = $data['_arcwindUptime'] ?? [];
+        $records = $uptime['statusPageResourceUptimes'] ?? [];
+        foreach (($uptime['groupUptimes'] ?? []) as $group) {
+            if (is_array($group)) $records = array_merge($records, $group['statusPageResourceUptimes'] ?? []);
+        }
+        foreach ($records as $record) {
+            if (is_array($record) && $this->normalize_id($record['statusPageResourceId'] ?? '') === $id) return $record;
+        }
+        return null;
+    }
+
     private function resource_status($resource, $data) {
+        $record = $this->uptime_record($resource, $data);
+        if ($record && !empty($record['currentStatus'])) return $record['currentStatus'];
         foreach (['currentStatus', 'currentMonitorStatus', 'monitorStatus'] as $key) {
             if (!empty($resource[$key]) && is_array($resource[$key])) return $resource[$key];
         }
@@ -137,8 +167,14 @@ class ArcWind_Init_OneUptime_Dashboard {
             echo '<li style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #eee;padding:7px 0">';
             echo '<span>' . esc_html($name) . '</span>';
             $status = $this->resource_status($resource, $data);
+            echo '<span style="text-align:right">';
             if ($status) $this->colored_status($status);
-            else echo '<span>–</span>';
+            else echo '–';
+            $uptime = $this->uptime_record($resource, $data);
+            if ($uptime && isset($uptime['uptimePercent']) && is_numeric($uptime['uptimePercent'])) {
+                echo '<small style="display:block;color:#646970">' . esc_html(number_format_i18n((float) $uptime['uptimePercent'], 2)) . '% drifttid</small>';
+            }
+            echo '</span>';
             echo '</li>';
         }
         echo '</ul>';
