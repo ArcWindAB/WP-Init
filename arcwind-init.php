@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: Initierar PostHog (EU som standard) och lägger till en enkel dashboard-widget “Statistik” (aktiva användare & sidvisningar) samt en feedback-widget. Inkluderar felspårning.
- * Version:     1.6.2
+ * Version:     1.7.0
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init
@@ -11,6 +11,8 @@
 
 if (!defined('ABSPATH')) exit;
 require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-tracker.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-oneuptime.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-oneuptime-dashboard.php';
 
 class ArcWind_Init {
     const OPTION_KEY    = 'arcwind_init_settings';
@@ -29,6 +31,8 @@ class ArcWind_Init {
 
         // Settings + menu
         add_action('admin_init',         [$this, 'register_settings']);
+        new ArcWind_Init_OneUptime();
+        new ArcWind_Init_OneUptime_Dashboard();
         add_action('admin_menu',         [$this, 'add_settings_page']);
 
         // Dashboard widgets
@@ -76,6 +80,7 @@ class ArcWind_Init {
 
                     // Feedback widget
                     'feedback_uuid'      => '',
+                    'feedback_enabled'   => 1,
 
                     // Error tracking
                     'enable_error_tracking' => 1,
@@ -90,14 +95,14 @@ class ArcWind_Init {
             function () {
                 echo '<p>Konfigurera PostHog för startsidans widget (server-side Query API). EU-molnets värd är förifylld.</p>';
             },
-            'arcwind_init'
+            'arcwind_init_posthog'
         );
         add_settings_field('arcwind_init_host', __('PostHog-värd', 'arcwind-init'),
-            [$this, 'render_input_host'], 'arcwind_init', 'arcwind_init_main');
+            [$this, 'render_input_host'], 'arcwind_init_posthog', 'arcwind_init_main');
         add_settings_field('arcwind_init_project_id', __('Project ID', 'arcwind-init'),
-            [$this, 'render_input_project_id'], 'arcwind_init', 'arcwind_init_main');
+            [$this, 'render_input_project_id'], 'arcwind_init_posthog', 'arcwind_init_main');
         add_settings_field('arcwind_init_personal_api_key', __('Personal API Key (phx_...)', 'arcwind-init'),
-            [$this, 'render_input_personal_api_key'], 'arcwind_init', 'arcwind_init_main');
+            [$this, 'render_input_personal_api_key'], 'arcwind_init_posthog', 'arcwind_init_main');
 
         add_settings_section(
             'arcwind_init_frontend',
@@ -105,18 +110,18 @@ class ArcWind_Init {
             function () {
                 echo '<p>Aktivera PostHog på din webbplats med din publika API-nyckel (phc_...). Snippet laddas alltid; inloggade användare identifieras.</p>';
             },
-            'arcwind_init'
+            'arcwind_init_posthog'
         );
         add_settings_field('arcwind_init_enable_tracking', __('Aktivera spårning', 'arcwind-init'),
-            [$this, 'render_checkbox_enable_tracking'], 'arcwind_init', 'arcwind_init_frontend');
+            [$this, 'render_checkbox_enable_tracking'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_public_api_key', __('Public API Key (phc_...)', 'arcwind-init'),
-            [$this, 'render_input_public_api_key'], 'arcwind_init', 'arcwind_init_frontend');
+            [$this, 'render_input_public_api_key'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_capture_pageview', __('Registrera sidvisning vid laddning', 'arcwind-init'),
-            [$this, 'render_checkbox_capture_pageview'], 'arcwind_init', 'arcwind_init_frontend');
+            [$this, 'render_checkbox_capture_pageview'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_autocapture', __('Autocapture (klick, formulär, m.m.)', 'arcwind-init'),
-            [$this, 'render_checkbox_autocapture'], 'arcwind_init', 'arcwind_init_frontend');
+            [$this, 'render_checkbox_autocapture'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_load_position', __('Laddningsposition', 'arcwind-init'),
-            [$this, 'render_select_load_position'], 'arcwind_init', 'arcwind_init_frontend');
+            [$this, 'render_select_load_position'], 'arcwind_init_posthog', 'arcwind_init_frontend');
 
         add_settings_section(
             'arcwind_init_feedback',
@@ -124,10 +129,12 @@ class ArcWind_Init {
             function () {
                 echo '<p>Ställ in kort-UUID som används av knappen <em>“Rapportera fel eller önska funktion”</em> (öppnar <code>https://t.arc.vin/s/{UUID}</code>).</p>';
             },
-            'arcwind_init'
+            'arcwind_init_feedback_tab'
         );
+        add_settings_field('arcwind_init_feedback_enabled', __('Aktivera feedback', 'arcwind-init'),
+            [$this, 'render_feedback_enabled'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
         add_settings_field('arcwind_init_feedback_uuid', __('Feedback-UUID (t.ex. MM0H1A5A)', 'arcwind-init'),
-            [$this, 'render_input_feedback_uuid'], 'arcwind_init', 'arcwind_init_feedback');
+            [$this, 'render_input_feedback_uuid'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
 
         add_settings_section(
             'arcwind_init_errors',
@@ -135,12 +142,12 @@ class ArcWind_Init {
             function () {
                 echo '<p>Skicka plugin-/serverfel som events till PostHog (använder din publika API-nyckel via server-side capture).</p>';
             },
-            'arcwind_init'
+            'arcwind_init_posthog'
         );
         add_settings_field('arcwind_init_enable_error_tracking', __('Aktivera felspårning', 'arcwind-init'),
-            [$this, 'render_checkbox_enable_error_tracking'], 'arcwind_init', 'arcwind_init_errors');
+            [$this, 'render_checkbox_enable_error_tracking'], 'arcwind_init_posthog', 'arcwind_init_errors');
         add_settings_field('arcwind_init_error_distinct_id', __('Distinct ID för fel', 'arcwind-init'),
-            [$this, 'render_input_error_distinct_id'], 'arcwind_init', 'arcwind_init_errors');
+            [$this, 'render_input_error_distinct_id'], 'arcwind_init_posthog', 'arcwind_init_errors');
     }
 
     public function add_settings_page() {
@@ -154,6 +161,11 @@ class ArcWind_Init {
     }
 
     public function sanitize_settings($input) {
+        $old = get_option(self::OPTION_KEY, []);
+        $tab = isset($_POST['arcwind_init_active_tab']) ? sanitize_key(wp_unslash($_POST['arcwind_init_active_tab'])) : 'posthog';
+        $input = is_array($input) ? $input : [];
+        $old = wp_parse_args((array) $old, ['feedback_enabled' => 1]);
+        $input = array_merge($old, $input);
         $out = [];
         // Server (widget)
         $out['host']               = isset($input['host']) ? esc_url_raw(trim($input['host'])) : 'https://tel.arc.vin/_p';
@@ -168,6 +180,7 @@ class ArcWind_Init {
         $out['load_position']      = in_array(($input['load_position'] ?? 'head'), ['head','footer'], true) ? $input['load_position'] : 'head';
 
         // Feedback
+        $out['feedback_enabled'] = empty($input['feedback_enabled']) ? 0 : 1;
         $out['feedback_uuid']      = isset($input['feedback_uuid']) ? preg_replace('/[^A-Za-z0-9]/', '', strtoupper($input['feedback_uuid'])) : '';
 
         // Error tracking
@@ -177,29 +190,41 @@ class ArcWind_Init {
         return $out;
     }
 
+    public function render_feedback_enabled() {
+        $o = get_option(self::OPTION_KEY);
+        echo '<label><input type="checkbox" name="' . esc_attr(self::OPTION_KEY) . '[feedback_enabled]" value="1" ' . checked(!isset($o['feedback_enabled']) || $o['feedback_enabled'], true, false) . '> Aktivera feedback</label>';
+    }
+
     public function render_settings_page() {
         if (!current_user_can('manage_options')) return;
-        ?>
-        <div class="wrap">
-            <h1><?php esc_html_e('ArcWind Init – Inställningar', 'arcwind-init'); ?></h1>
-            <form method="post" action="options.php">
-                <?php
-                    settings_fields('arcwind_init_settings_group');
-                    do_settings_sections('arcwind_init');
-                    wp_nonce_field(self::NONCE_KEY, self::NONCE_KEY);
-                    submit_button(__('Spara ändringar', 'arcwind-init'));
-                ?>
-            </form>
-            <hr>
-            <h2>Tips</h2>
-            <ul>
-                <li>Standardvärd är <code>https://tel.arc.vin/_p</code> (EU-moln). Ändra vid behov.</li>
-                <li><strong>Personal API Key</strong> (phx_...) används för server-side Query API (widgeten).</li>
-                <li><strong>Public API Key</strong> (phc_...) används för webbläsarsnippet och felspårning.</li>
-                <li>Feedback-knappen öppnar: <code>https://t.arc.vin/s/{UUID}</code>.</li>
-            </ul>
-        </div>
-        <?php
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'posthog';
+        if (!in_array($tab, ['posthog', 'feedback', 'oneuptime'], true)) $tab = 'posthog';
+        $tabs = ['posthog' => 'PostHog', 'feedback' => 'Feedback', 'oneuptime' => 'OneUptime'];
+        echo '<div class="wrap"><h1>ArcWind Init – Inställningar</h1><nav class="nav-tab-wrapper" aria-label="Integrationer">';
+        foreach ($tabs as $key => $label) {
+            $url = add_query_arg(['page' => 'arcwind_init', 'tab' => $key], admin_url('options-general.php'));
+            echo '<a class="nav-tab ' . ($tab === $key ? 'nav-tab-active' : '') . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
+        }
+        echo '</nav><form method="post" action="options.php">';
+        if ($tab === 'oneuptime') {
+            settings_fields('arcwind_init_oneuptime_group');
+            do_settings_sections('arcwind_init_oneuptime');
+        } else {
+            settings_fields('arcwind_init_settings_group');
+            echo '<input type="hidden" name="arcwind_init_active_tab" value="' . esc_attr($tab) . '">';
+            if ($tab === 'feedback') {
+                echo '<input type="hidden" name="' . esc_attr(self::OPTION_KEY) . '[feedback_enabled]" value="0">';
+                do_settings_sections('arcwind_init_feedback_tab');
+            } else {
+                echo '<input type="hidden" name="' . esc_attr(self::OPTION_KEY) . '[enable_tracking]" value="0">';
+                echo '<input type="hidden" name="' . esc_attr(self::OPTION_KEY) . '[capture_pageview]" value="0">';
+                echo '<input type="hidden" name="' . esc_attr(self::OPTION_KEY) . '[autocapture]" value="0">';
+                echo '<input type="hidden" name="' . esc_attr(self::OPTION_KEY) . '[enable_error_tracking]" value="0">';
+                do_settings_sections('arcwind_init_posthog');
+            }
+        }
+        submit_button(__('Spara ändringar', 'arcwind-init'));
+        echo '</form></div>';
     }
 
     /* ===== Field renderers ===== */
@@ -250,7 +275,8 @@ class ArcWind_Init {
             [$this, 'render_dashboard_widget']
         );
 
-        wp_add_dashboard_widget(
+        $feedback_options = get_option(self::OPTION_KEY, []);
+        if (!isset($feedback_options['feedback_enabled']) || $feedback_options['feedback_enabled']) wp_add_dashboard_widget(
             'arcwind_init_feedback_widget',
             __('Rapportera fel eller önska funktion', 'arcwind-init'),
             [$this, 'render_feedback_widget']

@@ -284,3 +284,28 @@ Kontrollera:
 # Licens
 
 GPL‑2.0‑or‑later
+
+
+## OneUptime
+
+Gå till **Inställningar → ArcWind Init → OneUptime**.
+
+- Aktivera OneUptime och ange adressen till din **publika** statussida (t.ex. `https://status.example.com`).
+- Ange statussidans **Status Page ID** (från OneUptime) eller verifierade domän.
+- Aktivera informationsbannern och välj separat om du vill visa **incidenter**, **Announcements** och **planerade underhåll**. Uppgifter hämtas från respektive publikt status-API och cachelagras i 60 sekunder. Inga API-nycklar behövs för en publik statussida.
+- Skapa en **Incoming Request**-monitor i OneUptime, kopiera den hemliga `https://oneuptime.example.com/heartbeat/SECRET`-adressen och aktivera heartbeat.
+- Heartbeat skickas från servern varje minut så länge OneUptime och heartbeat är aktiverade.
+
+**Viktigt om cron:** WP-Cron triggas normalt av inkommande webbtrafik och är därför inte minutexakt på webbplatser med lite trafik. För tillförlitlig övervakning behöver du köra verklig cron var 60:e sekund som anropar WordPress `wp-cron.php`, gärna med `DISABLE_WP_CRON` aktiverat i WordPress. Ställ in OneUptimes larmtröskel med marginal för tillfälliga fördröjningar, till exempel utebliven heartbeat under 3 minuter.
+
+Heartbeat-URL:en innehåller en hemlighet. Dela den inte offentligt eller i felsökningsloggar.
+
+## Inställningsflikar
+
+Inställningarna är uppdelade i **PostHog**, **Feedback** och **OneUptime**. Befintliga PostHog-inställningar och feedback-UUID behålls vid uppdateringen. PostHog-spårning och feedback-widgeten kan aktiveras eller stängas av separat.
+
+Bannern använder rött för incidenter, blått för Announcements och gult för planerade underhåll. Högst tio meddelanden visas samtidigt. Endast publicerade Announcements visas; framtida publiceringstider filtreras bort.
+
+## WordPress dashboard: OneUptime – Driftstatus
+
+När OneUptime är aktiverat visas widgeten **OneUptime – Driftstatus** på WordPress startsida för administratörer. Den hämtar OneUptimes publika `/status-page-api/overview/{id}` och `/status-page-api/uptime/{id}` från WordPress-servern och cachelagrar resultaten i 60 sekunder. Widgeten visar övergripande status, samtliga publicerade komponenter/tjänster och grupper, deras aktuella status och eventuell drifttidsprocent samt aktiva incidenter, episoder, underhåll och meddelanden. Den länkar till den ursprungliga statussidan och visar ett felmeddelande om API:et inte går att nå. Uptime-API:et kräver ett statuspage-ID (inte bara ett domänalias).
