@@ -15,3 +15,5 @@ jobs:
       - name: Lint all PHP files
         run: |
           find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+      - name: Test OneUptime date parsing
+        run: php tests/oneuptime-dates.php
