@@ -136,12 +136,13 @@ class ArcWind_Init_OneUptime {
     public function banner_styles() {
         $o = $this->options();
         if (!$o['enabled'] || !$o['banner_enabled']) return;
-        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;background:#8b211c;color:#fff;padding:12px 20px;text-align:center;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner a{color:#fff;text-decoration:underline}body.admin-bar #wpadminbar{top:44px}body.admin-bar{padding-top:0!important}@media(max-width:782px){body.admin-bar #wpadminbar{top:60px}} </style>';
+        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;background:#8b211c;color:#fff;padding:12px 20px;text-align:center;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner a{color:#fff;text-decoration:underline}</style>';
     }
 
     public function render_banner() {
         $item = $this->active_incident();
         if (!$item) return;
+        echo '<style>body.admin-bar #wpadminbar{top:44px}@media(max-width:782px){body.admin-bar #wpadminbar{top:60px}}</style>';
         echo '<div id="arcwind-oneuptime-banner" role="status" aria-live="polite"><strong>Driftinformation:</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer på statussidan</a></div>';
     }
 
