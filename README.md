@@ -305,3 +305,7 @@ Heartbeat-URL:en innehåller en hemlighet. Dela den inte offentligt eller i fels
 Inställningarna är uppdelade i **PostHog**, **Feedback** och **OneUptime**. Befintliga PostHog-inställningar och feedback-UUID behålls vid uppdateringen. PostHog-spårning och feedback-widgeten kan aktiveras eller stängas av separat.
 
 Bannern använder rött för incidenter, blått för Announcements och gult för planerade underhåll. Högst tio meddelanden visas samtidigt. Endast publicerade Announcements visas; framtida publiceringstider filtreras bort.
+
+## WordPress dashboard: OneUptime – Driftstatus
+
+När OneUptime är aktiverat visas widgeten **OneUptime – Driftstatus** på WordPress startsida för administratörer. Den hämtar OneUptimes publika `/status-page-api/overview/{id}` och `/status-page-api/uptime/{id}` från WordPress-servern och cachelagrar resultaten i 60 sekunder. Widgeten visar övergripande status, samtliga publicerade komponenter/tjänster och grupper, deras aktuella status och eventuell drifttidsprocent samt aktiva incidenter, episoder, underhåll och meddelanden. Den länkar till den ursprungliga statussidan och visar ett felmeddelande om API:et inte går att nå. Uptime-API:et kräver ett statuspage-ID (inte bara ett domänalias).
