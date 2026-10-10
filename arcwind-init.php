@@ -127,7 +127,7 @@ class ArcWind_Init {
             function () {
                 echo '<p>Ställ in kort-UUID som används av knappen <em>“Rapportera fel eller önska funktion”</em> (öppnar <code>https://t.arc.vin/s/{UUID}</code>).</p>';
             },
-            'arcwind_init_posthog'
+            'arcwind_init_feedback_tab'
         );
         add_settings_field('arcwind_init_feedback_enabled', __('Aktivera feedback', 'arcwind-init'),
             [$this, 'render_feedback_enabled'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
@@ -162,7 +162,8 @@ class ArcWind_Init {
         $old = get_option(self::OPTION_KEY, []);
         $tab = isset($_POST['arcwind_init_active_tab']) ? sanitize_key(wp_unslash($_POST['arcwind_init_active_tab'])) : 'posthog';
         $input = is_array($input) ? $input : [];
-        $input = array_merge((array) $old, $input);
+        $old = wp_parse_args((array) $old, ['feedback_enabled' => 1]);
+        $input = array_merge($old, $input);
         $out = [];
         // Server (widget)
         $out['host']               = isset($input['host']) ? esc_url_raw(trim($input['host'])) : 'https://tel.arc.vin/_p';
