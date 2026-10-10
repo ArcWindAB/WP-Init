@@ -284,3 +284,22 @@ Kontrollera:
 # Licens
 
 GPL‑2.0‑or‑later
+
+
+## OneUptime
+
+Gå till **Inställningar → ArcWind Init → OneUptime**.
+
+- Aktivera OneUptime och ange adressen till din **publika** statussida (t.ex. `https://status.example.com`).
+- Ange statussidans **Status Page ID** (från OneUptime) eller verifierade domän.
+- Aktivera incidentbannern för att visa öppna incidenter på webbplatsens frontend. Incidenter hämtas server-side via `/status-page-api/incidents/{id}` och cachelagras i 60 sekunder. Inga API-nycklar behövs för en publik statussida.
+- Skapa en **Incoming Request**-monitor i OneUptime, kopiera den hemliga `https://oneuptime.example.com/heartbeat/SECRET`-adressen och aktivera heartbeat.
+- Heartbeat skickas från servern varje minut så länge OneUptime och heartbeat är aktiverade.
+
+**Viktigt om cron:** WP-Cron triggas normalt av inkommande webbtrafik och är därför inte minutexakt på webbplatser med lite trafik. För tillförlitlig övervakning behöver du köra verklig cron var 60:e sekund som anropar WordPress `wp-cron.php`, gärna med `DISABLE_WP_CRON` aktiverat i WordPress. Ställ in OneUptimes larmtröskel med marginal för tillfälliga fördröjningar, till exempel utebliven heartbeat under 3 minuter.
+
+Heartbeat-URL:en innehåller en hemlighet. Dela den inte offentligt eller i felsökningsloggar.
+
+## Inställningsflikar
+
+Inställningarna är uppdelade i **PostHog**, **Feedback** och **OneUptime**. Befintliga PostHog-inställningar och feedback-UUID behålls vid uppdateringen. PostHog-spårning och feedback-widgeten kan aktiveras eller stängas av separat.
