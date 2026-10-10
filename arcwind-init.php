@@ -12,6 +12,7 @@
 if (!defined('ABSPATH')) exit;
 require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-tracker.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-oneuptime.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-arcwind-init-oneuptime-dashboard.php';
 
 class ArcWind_Init {
     const OPTION_KEY    = 'arcwind_init_settings';
@@ -31,6 +32,7 @@ class ArcWind_Init {
         // Settings + menu
         add_action('admin_init',         [$this, 'register_settings']);
         new ArcWind_Init_OneUptime();
+        new ArcWind_Init_OneUptime_Dashboard();
         add_action('admin_menu',         [$this, 'add_settings_page']);
 
         // Dashboard widgets
