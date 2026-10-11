@@ -2,6 +2,7 @@
 /** Run: php tests/oneuptime-responses.php */
 define('ABSPATH', __DIR__ . '/');
 define('MINUTE_IN_SECONDS', 60);
+define('DAY_IN_SECONDS', 86400);
 
 class WP_Error {
     private $code;
@@ -15,6 +16,8 @@ $options = ['enabled' => 1, 'status_url' => 'https://status.example.test', 'stat
     'banner_enabled' => 1, 'show_incidents' => 1, 'show_announcements' => 1, 'show_maintenance' => 1];
 $transients = [];
 $responses = [];
+$request_count = 0;
+$scheduled_history = false;
 $log = tempnam(sys_get_temp_dir(), 'oneuptime-log-');
 ini_set('log_errors', '1');
 ini_set('error_log', $log);
@@ -25,22 +28,29 @@ function wp_parse_args($args, $defaults) { return array_merge($defaults, $args);
 function get_transient($key) { global $transients; return $transients[$key] ?? false; }
 function set_transient($key, $value, $ttl) { global $transients; $transients[$key] = $value; }
 function wp_parse_url($url) { return parse_url($url); }
+function wp_json_encode($value) { return json_encode($value); }
+function wp_next_scheduled($hook) { global $scheduled_history; return $scheduled_history; }
+function wp_schedule_single_event($time, $hook) { global $scheduled_history; $scheduled_history = $time; }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function wp_remote_retrieve_response_code($response) { return $response['code'] ?? 0; }
 function wp_remote_retrieve_body($response) { return $response['body'] ?? ''; }
 function wp_safe_remote_get($url, $args) { return test_response($url); }
 function wp_safe_remote_post($url, $args) { return test_response($url); }
 function test_response($url) {
-    global $responses;
+    global $responses, $request_count;
+    $request_count++;
     if (!preg_match('~/status-page-api/([^/]+)/~', $url, $matches)) throw new Exception('Unexpected URL');
     return $responses[$matches[1]] ?? new WP_Error('unavailable', 'secret-token');
 }
 function esc_html($value) { if (!is_string($value)) throw new Exception('Non-string HTML value'); return htmlspecialchars($value, ENT_QUOTES); }
 function esc_attr($value) { return esc_html($value); }
+function esc_js($value) { return esc_html($value); }
 function esc_url($value) { return esc_html($value); }
 function sanitize_text_field($value) { if (!is_string($value)) throw new Exception('Non-string title'); return trim(strip_tags($value)); }
 function number_format_i18n($value, $decimals) { return number_format($value, $decimals); }
 function admin_url($path) { return 'https://example.test/wp-admin/' . $path; }
+function get_current_user_id() { return 1; }
+function wp_date($format, $timestamp) { return gmdate($format, $timestamp); }
 
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-oneuptime.php';
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-oneuptime-dashboard.php';
@@ -81,11 +91,29 @@ try {
     check(strpos($banner, 'Open incident') !== false && strpos($banner, 'Planned work') !== false, 'Valid banner missing messages');
     check(strpos($notice, 'Open incident') !== false, 'Valid admin notice missing message');
     check(strpos($dashboard, 'Website') !== false && strpos($dashboard, '99.95') !== false, 'Valid dashboard missing resource');
+    check($scheduled_history !== false, 'History was not scheduled in the background');
+    $history_dashboard = new ArcWind_Init_OneUptime_Dashboard();
+    $history_dashboard->refresh_history();
+    check(isset($transients[ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE]['windows']['30d']), 'History windows were not fetched');
+    unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
+    ob_start();
+    $history_dashboard->render();
+    $history_html = ob_get_clean();
+    check(strpos($history_html, '24 timmar') !== false && strpos($history_html, '30 dagar') !== false, 'History bars were not rendered');
+    unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
+    $responses['overview'] = new WP_Error('network', 'secret-token');
+    [, $stale_dashboard] = render_pair();
+    check(strpos($stale_dashboard, 'ej aktuell') !== false && strpos($stale_dashboard, 'Website') !== false, 'Last good overview not marked stale');
+    $requests_after_failure = $request_count;
+    render_pair();
+    check($request_count === $requests_after_failure, 'Failure backoff did not prevent repeated requests');
 
     load_fixture('nested');
     [$banner, $dashboard] = render_pair();
     check(strpos($banner, 'Nested notice') !== false, 'Wrapped date was not parsed');
     check(strpos($dashboard, 'API') !== false && strpos($dashboard, '98.50') !== false, 'Nested uptime was not parsed');
+    check(substr_count($dashboard, 'Worker') === 1 && strpos($dashboard, 'Backend') < strpos($dashboard, 'Jobs'), 'Nested group was not rendered once under its parent');
+    check(strpos($dashboard, 'Drifttid: uppgift saknas') !== false, 'Missing uptime was not labeled unavailable');
 
     load_fixture('malformed');
     [$banner, $dashboard] = render_pair();
@@ -119,6 +147,9 @@ try {
     check($banner === '', 'Malformed cached message appeared');
     check(strpos(file_get_contents($log), 'secret-token') === false, 'Sensitive error text was logged');
     echo "OneUptime response regression tests passed.\n";
+} catch (Throwable $error) {
+    fwrite(STDERR, $error->getMessage() . "\n");
+    exit(1);
 } finally {
     unlink($log);
 }

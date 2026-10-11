@@ -19,8 +19,12 @@
             is_admin: !!config.isAdmin
         }, properties || {});
 
-        window.posthog.capture(eventName, merged);
-        return true;
+        try {
+            window.posthog.capture(eventName, merged);
+            return true;
+        } catch (error) {
+            return false;
+        }
     };
 
     window.ArcWindInit.identify = function (distinctId, properties) {
@@ -28,7 +32,11 @@
             return false;
         }
 
-        window.posthog.identify(distinctId, properties || {});
-        return true;
+        try {
+            window.posthog.identify(distinctId, properties || {});
+            return true;
+        } catch (error) {
+            return false;
+        }
     };
 })(window);

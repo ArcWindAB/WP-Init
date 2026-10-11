@@ -2,12 +2,12 @@
   "overview": {
     "statusPage": {"displayName": "Nested status"},
     "overallStatus": {"name": "Operational", "color": {"value": "#237a45"}},
-    "statusPageResources": [{"_id": {"value": "resource-2"}, "displayName": "API", "statusPageGroupId": {"value": "group-2"}}],
-    "resourceGroups": [{"_id": {"value": "group-2"}, "name": "Backend"}]
+    "statusPageResources": [{"_id": {"value": "resource-2"}, "displayName": "API", "statusPageGroupId": {"value": "group-2"}}, {"_id": {"value": "resource-3"}, "displayName": "Worker", "statusPageGroupId": {"value": "group-3"}}],
+    "resourceGroups": [{"_id": {"value": "group-2"}, "name": "Backend"}, {"_id": {"value": "group-3"}, "parentStatusPageGroupId": {"value": "group-2"}, "name": "Jobs"}]
   },
   "uptime": {
     "statusPageResourceUptimes": null,
-    "groupUptimes": [{"statusPageResourceUptimes": [{"statusPageResourceId": {"value": "resource-2"}, "uptimePercent": 98.5, "currentStatus": {"name": "Degraded"}}]}]
+    "groupUptimes": [{"statusPageGroupId": {"value": "group-2"}, "statusPageResourceUptimes": [{"statusPageResourceId": {"value": "resource-2"}, "uptimePercent": 98.5, "currentStatus": {"name": "Degraded"}}]}, {"statusPageGroupId": {"value": "group-3"}, "parentStatusPageGroupId": {"value": "group-2"}, "statusPageResourceUptimes": [{"statusPageResourceId": {"value": "resource-3"}, "uptimePercent": null}]}]
   },
   "incidents": {"incidents": [{"title": "Nested incident", "currentIncidentState": {"name": "Investigating"}}]},
   "announcements": {"announcements": [{"title": "Nested notice", "showAnnouncementAt": {"date": {"value": "2020-01-01T00:00:00Z"}}}]},

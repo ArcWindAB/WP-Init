@@ -3,13 +3,13 @@
 if (!defined('ABSPATH')) exit;
 
 class ArcWind_Init_Tracker {
-    public static function capture($event, $properties = [], $distinct_id = null) {
-        $opts = get_option(ArcWind_Init::OPTION_KEY);
+    public static function capture($event, $properties = [], $distinct_id = null, $blocking = true) {
+        $opts = (array) get_option(ArcWind_Init::OPTION_KEY, []);
 
-        $public_key = $opts['public_api_key'] ?? '';
-        $host       = rtrim($opts['host'] ?? 'https://tel.arc.vin/_p', '/');
+        $public_key = is_string($opts['public_api_key'] ?? null) ? $opts['public_api_key'] : '';
+        $host       = is_string($opts['host'] ?? null) ? rtrim($opts['host'], '/') : '';
 
-        if (empty($public_key) || empty($host) || empty($event)) {
+        if (empty($public_key) || empty($host) || !is_string($event) || $event === '' || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {
             return false;
         }
 
@@ -40,16 +40,25 @@ class ArcWind_Init_Tracker {
             'properties'  => array_merge($base_properties, is_array($properties) ? $properties : []),
         ];
 
-        $response = wp_remote_post($host . '/capture/', [
+        try {
+            $response = wp_safe_remote_post($host . '/capture/', [
             'method'  => 'POST',
-            'timeout' => 10,
+            'timeout' => $blocking ? 3 : 1,
+            'blocking' => $blocking,
+            'redirection' => 0,
             'headers' => [
                 'Content-Type' => 'application/json',
                 'Accept'       => 'application/json',
             ],
             'body'    => wp_json_encode($payload),
-        ]);
+            ]);
+        } catch (Throwable $error) {
+            return false;
+        }
 
-        return !is_wp_error($response) && wp_remote_retrieve_response_code($response) >= 200 && wp_remote_retrieve_response_code($response) < 300;
+        if (is_wp_error($response) || !is_array($response)) return false;
+        if (!$blocking) return true;
+        $code = wp_remote_retrieve_response_code($response);
+        return is_int($code) && $code >= 200 && $code < 300;
     }
 }
