@@ -32,7 +32,14 @@ class ArcWind_Init_OneUptime_Dashboard {
     public function register_widget() {
         $o = $this->options();
         if (!$o['enabled']) return;
-        wp_add_dashboard_widget('arcwind_init_oneuptime_status', __('OneUptime – Driftstatus', 'arcwind-init'), [$this, 'render']);
+        $title = 'Driftstatus';
+        if ($o['status_url'] && $o['status_page_id']) {
+            $result = $this->overview($o);
+            if (!is_wp_error($result) && isset($result['data']) && is_array($result['data'])) {
+                $title = $this->label($result['data']['statusPage'] ?? null, $title);
+            }
+        }
+        wp_add_dashboard_widget('arcwind_init_oneuptime_status', esc_html($title), [$this, 'render']);
     }
 
     private function overview($options) {
@@ -144,9 +151,9 @@ class ArcWind_Init_OneUptime_Dashboard {
     }
 
     private function records($data, $key, $title) {
-        $records = isset($data[$key]) && is_array($data[$key]) ? $data[$key] : [];
+        $records = ArcWind_Init_OneUptime::api_records($data, $key);
         if (!$records) return;
-        echo '<h4 style="margin:16px 0 6px">' . esc_html($title) . '</h4><ul style="margin:0">';
+        echo '<details style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">' . esc_html($title) . ' (' . count($records) . ')</summary><ul style="margin:8px 0 0 18px">';
         foreach ($records as $record) {
             if (!is_array($record)) continue;
             echo '<li style="padding:5px 0;border-bottom:1px solid #eee"><strong>' . esc_html($this->label($record)) . '</strong>';
@@ -154,7 +161,7 @@ class ArcWind_Init_OneUptime_Dashboard {
             if (is_array($state)) echo ' – ' . esc_html($this->label($state));
             echo '</li>';
         }
-        echo '</ul>';
+        echo '</ul></details>';
     }
 
     private function normalize_id($id) {
@@ -226,9 +233,9 @@ class ArcWind_Init_OneUptime_Dashboard {
     private function render_resources($data, $stale = false) {
         $resources = ArcWind_Init_OneUptime::api_records($data, 'statusPageResources');
         $groups = ArcWind_Init_OneUptime::api_records($data, 'resourceGroups');
-        echo '<h4 style="margin:16px 0 6px">Komponenter och tjänster</h4>';
+        echo '<details open style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">Komponenter och tjänster</summary>';
         if (!$resources && !$groups) {
-            echo '<p>Inga komponenter publicerade.</p>';
+            echo '<p style="margin:8px 0 0 18px">Inga komponenter publicerade.</p></details>';
             return;
         }
         $by_group = [];
@@ -263,69 +270,66 @@ class ArcWind_Init_OneUptime_Dashboard {
         foreach ($by_group as $id => $items) {
             if ($id !== '' && !isset($group_map[$id])) $this->resource_rows($items, $data, $stale);
         }
+        echo '</details>';
     }
 
     private function render_group($id, $group_map, $children, $by_group, $data, $stale, &$visited, $depth) {
         if (isset($visited[$id]) || $depth > 20) return;
         $visited[$id] = true;
         $group = $group_map[$id];
-        $indent = min($depth, 5) * 16;
-        echo '<h5 style="margin:12px 0 4px;padding-left:' . (int) $indent . 'px">' . esc_html($this->label($group, 'Grupp'));
+        echo '<details style="margin:6px 0 6px 16px;border-left:2px solid #dcdcde;padding-left:8px"><summary style="cursor:pointer;font-weight:600">' . esc_html($this->label($group, 'Grupp'));
         $uptime = $this->group_uptime_record($id, $data);
         if ($uptime && isset($uptime['currentStatus']) && is_array($uptime['currentStatus'])) {
             echo ' – ';
             $this->colored_status($uptime['currentStatus'], $stale);
         }
-        echo '</h5>';
+        echo '</summary>';
         $this->render_history($group, true);
-        $this->resource_rows($by_group[$id] ?? [], $data, $stale, $indent);
+        $this->resource_rows($by_group[$id] ?? [], $data, $stale);
         foreach ($children[$id] ?? [] as $child) $this->render_group($child, $group_map, $children, $by_group, $data, $stale, $visited, $depth + 1);
+        echo '</details>';
     }
 
-    private function resource_rows($resources, $data, $stale = false, $indent = 0) {
+    private function resource_rows($resources, $data, $stale = false) {
         if (!$resources) return;
-        echo '<ul style="margin:0;padding-left:' . (int) $indent . 'px">';
+        echo '<div style="margin-left:16px">';
         foreach ($resources as $resource) {
             $name = $this->label($resource['displayName'] ?? null, $this->label($resource['name'] ?? null, $this->label($resource)));
-            echo '<li style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;border-bottom:1px solid #eee;padding:7px 0">';
+            echo '<details style="border-bottom:1px solid #eee"><summary style="cursor:pointer;padding:7px 0"><span style="display:inline-flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;width:calc(100% - 20px);vertical-align:top">';
             echo '<span style="min-width:0;overflow-wrap:anywhere">' . esc_html($name) . '</span>';
             $status = $this->resource_status($resource, $data);
-            echo '<span style="text-align:right">';
+            echo '<span>';
             if ($status) $this->colored_status($status, $stale);
             else echo '–';
+            echo '</span></span></summary><div style="padding:0 0 8px 18px;color:#646970">';
             $uptime = $this->uptime_record($resource, $data);
             if ($uptime && isset($uptime['uptimePercent']) && is_scalar($uptime['uptimePercent']) && is_numeric($uptime['uptimePercent'])) {
-                echo '<small style="display:block;color:#646970">' . esc_html(number_format_i18n((float) $uptime['uptimePercent'], 2)) . '% drifttid</small>';
-            } else echo '<small style="display:block;color:#646970">Drifttid: uppgift saknas</small>';
+                echo '<div>' . esc_html(number_format_i18n((float) $uptime['uptimePercent'], 2)) . '% drifttid</div>';
+            } else echo '<div>Drifttid: uppgift saknas</div>';
             $this->render_history($resource);
-            echo '</span>';
-            echo '</li>';
+            echo '</div></details>';
         }
-        echo '</ul>';
+        echo '</div>';
     }
 
     public function render() {
         $o = $this->options();
         if (!$o['status_url'] || !$o['status_page_id']) {
-            echo '<p>Konfigurera statussidans URL och ID under <a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=oneuptime')) . '">ArcWind Init → OneUptime</a>.</p>';
+            echo '<p>Konfigurera statussidans URL och ID under <a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=oneuptime')) . '">statusinställningarna</a>.</p>';
             return;
         }
         $result = $this->overview($o);
         if (is_wp_error($result)) {
-            echo '<p role="alert">' . esc_html($result->get_error_message()) . '</p>';
+            echo '<p role="alert">Statusdata är tillfälligt otillgängliga.</p>';
             return;
         }
         $data = $result['data'];
         $stale = !empty($result['stale']);
         $this->history_data = $this->history($o);
-        if ($stale) echo '<p role="status">OneUptime kan inte nås. Nedan visas senast kända data från ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . '; statusen är inte aktuell.</p>';
+        if ($stale) echo '<p role="status">Statussidan kan inte nås. Senast kända data från ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' visas nedan; statusen är inte aktuell.</p>';
         if ($this->history_data === null) echo '<p>Historisk drifttid hämtas i bakgrunden.</p>';
         elseif (!empty($this->history_data['stale'])) echo '<p>Historisk drifttid är från en tidigare hämtning.</p>';
-        $page = $data['statusPage'] ?? [];
-        $title = $this->label($page, 'OneUptime');
-        echo '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px"><strong>' . esc_html($title) . '</strong>';
-        echo '<a target="_blank" rel="noopener noreferrer" href="' . esc_url($o['status_url']) . '">Öppna statussidan ↗</a></div>';
-        echo '<div style="padding:12px;background:#f6f7f7;border-radius:4px"><strong>' . ($stale ? 'Senast kända status: ' : 'Övergripande status: ') . '</strong>';
+        echo '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px"><strong>' . ($stale ? 'Senast kända status' : 'Aktuell status') . '</strong>';
         if (!empty($data['overallStatus'])) $this->colored_status($data['overallStatus'], $stale);
         else echo 'Ingen status tillgänglig';
         echo '</div>';
@@ -334,6 +338,6 @@ class ArcWind_Init_OneUptime_Dashboard {
         $this->records($data, 'activeEpisodes', 'Aktiva episoder');
         $this->records($data, 'scheduledMaintenanceEvents', 'Planerade underhåll');
         $this->records($data, 'activeAnnouncements', 'Meddelanden');
-        echo '<p style="margin:12px 0 0;color:#646970">Statusdata uppdateras högst en gång per minut. Senaste hämtning: ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . '.</p>';
+        echo '<p style="margin:12px 0 0;color:#646970;font-size:12px">Uppdaterad ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' · <a target="_blank" rel="noopener noreferrer" href="' . esc_url($o['status_url']) . '">Öppna statussidan ↗</a></p>';
     }
 }

@@ -18,6 +18,7 @@ $transients = [];
 $responses = [];
 $request_count = 0;
 $scheduled_history = false;
+$widget_title = null;
 $log = tempnam(sys_get_temp_dir(), 'oneuptime-log-');
 ini_set('log_errors', '1');
 ini_set('error_log', $log);
@@ -51,6 +52,7 @@ function number_format_i18n($value, $decimals) { return number_format($value, $d
 function admin_url($path) { return 'https://example.test/wp-admin/' . $path; }
 function get_current_user_id() { return 1; }
 function wp_date($format, $timestamp) { return gmdate($format, $timestamp); }
+function wp_add_dashboard_widget($id, $title) { global $widget_title; if ($id === 'arcwind_init_oneuptime_status') $widget_title = $title; }
 
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-oneuptime.php';
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-oneuptime-dashboard.php';
@@ -88,6 +90,9 @@ function add_filter() {}
 try {
     load_fixture('valid');
     [$banner, $dashboard, $notice] = render_pair();
+    (new ArcWind_Init_OneUptime_Dashboard())->register_widget();
+    check($widget_title === 'Example status', 'Widget title did not use status page name');
+    check(strpos($dashboard, 'OneUptime') === false && substr_count($dashboard, '<details') >= 3, 'Widget was not white labeled and collapsible');
     check(strpos($banner, 'Open incident') !== false && strpos($banner, 'Planned work') !== false, 'Valid banner missing messages');
     check(strpos($notice, 'Open incident') !== false, 'Valid admin notice missing message');
     check(strpos($dashboard, 'Website') !== false && strpos($dashboard, '99.95') !== false, 'Valid dashboard missing resource');
@@ -103,6 +108,8 @@ try {
     unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
     $responses['overview'] = new WP_Error('network', 'secret-token');
     [, $stale_dashboard] = render_pair();
+    (new ArcWind_Init_OneUptime_Dashboard())->register_widget();
+    check($widget_title === 'Example status', 'Stale status page title was lost');
     check(strpos($stale_dashboard, 'ej aktuell') !== false && strpos($stale_dashboard, 'Website') !== false, 'Last good overview not marked stale');
     $requests_after_failure = $request_count;
     render_pair();
@@ -110,6 +117,8 @@ try {
 
     load_fixture('nested');
     [$banner, $dashboard] = render_pair();
+    (new ArcWind_Init_OneUptime_Dashboard())->register_widget();
+    check($widget_title === 'Nested status', 'Nested status page title was not used');
     check(strpos($banner, 'Nested notice') !== false, 'Wrapped date was not parsed');
     check(strpos($dashboard, 'API') !== false && strpos($dashboard, '98.50') !== false, 'Nested uptime was not parsed');
     check(substr_count($dashboard, 'Worker') === 1 && strpos($dashboard, 'Backend') < strpos($dashboard, 'Jobs'), 'Nested group was not rendered once under its parent');
@@ -117,6 +126,8 @@ try {
 
     load_fixture('malformed');
     [$banner, $dashboard] = render_pair();
+    (new ArcWind_Init_OneUptime_Dashboard())->register_widget();
+    check($widget_title === 'Driftstatus', 'Malformed title did not use safe fallback');
     check($banner === '', 'Malformed records appeared in banner');
     check(strpos($dashboard, 'Komponenter och tjänster') !== false, 'Malformed dashboard did not render');
 

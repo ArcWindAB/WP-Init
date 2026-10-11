@@ -67,7 +67,7 @@ try {
     ob_start();
     (new ArcWind_Init_OneUptime_Dashboard())->render();
     $dashboard = ob_get_clean();
-    arcwind_smoke_check(strpos($dashboard, 'Smoke status') !== false, 'Dashboard did not render');
+    arcwind_smoke_check(strpos($dashboard, 'Operational') !== false && strpos($dashboard, '<details') !== false, 'Dashboard did not render');
     ob_start();
     $oneuptime->render_banner();
     $banner = ob_get_clean();

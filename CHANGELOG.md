@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Use the status page name as the WordPress dashboard widget title and show status details in collapsible sections.
 - Add PostHog reverse proxy, UI host, region, defaults and person profile settings; hide unconfigured PostHog and Feedback dashboard widgets.
 - Harden OneUptime response handling, heartbeat validation, caching, dashboard hierarchy, history, and diagnostics.
 - Isolate external service failures and mask saved API and heartbeat secrets in settings.
