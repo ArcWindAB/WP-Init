@@ -6,18 +6,24 @@ trait ArcWind_Init_Dashboard_Trait {
      * Dashboard widgets
      * ========================= */
     public function register_dashboard_widgets() {
-        wp_add_dashboard_widget(
-            'arcwind_init_dashboard_widget',
-            __('Statistik', 'arcwind-init'),
-            [$this, 'render_dashboard_widget']
-        );
+        $options = $this->options();
+        if (!empty($options['host']) && wp_parse_url($options['host'], PHP_URL_SCHEME) === 'https' &&
+            !empty($options['project_id']) && !empty($options['personal_api_key'])) {
+            wp_add_dashboard_widget(
+                'arcwind_init_dashboard_widget',
+                __('Statistik', 'arcwind-init'),
+                [$this, 'render_dashboard_widget']
+            );
+        }
 
-        $feedback_options = $this->options();
-        if (!isset($feedback_options['feedback_enabled']) || $feedback_options['feedback_enabled']) wp_add_dashboard_widget(
-            'arcwind_init_feedback_widget',
-            __('Rapportera fel eller önska funktion', 'arcwind-init'),
-            [$this, 'render_feedback_widget']
-        );
+        if ((!isset($options['feedback_enabled']) || $options['feedback_enabled']) &&
+            !empty($options['feedback_uuid']) && preg_match('/^[A-Za-z0-9]+$/', $options['feedback_uuid'])) {
+            wp_add_dashboard_widget(
+                'arcwind_init_feedback_widget',
+                __('Rapportera fel eller önska funktion', 'arcwind-init'),
+                [$this, 'render_feedback_widget']
+            );
+        }
     }
 
     public function render_dashboard_widget() {

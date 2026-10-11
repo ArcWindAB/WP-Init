@@ -45,11 +45,27 @@ trait ArcWind_Init_PostHog_Trait {
     }
 
     private function print_snippet($opts) {
-        $host            = rtrim($opts['host'] ?? 'https://tel.arc.vin/_p', '/');
+        $region = ($opts['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
+        $host = array_key_exists('api_host', $opts)
+            ? (($opts['api_host'] ?? '') ?: 'https://' . $region . '.i.posthog.com')
+            : ($opts['host'] ?? 'https://tel.arc.vin/_p');
+        $host = rtrim($host, '/');
         $public_api_key  = $opts['public_api_key'] ?? '';
         $capture_pageview= !empty($opts['capture_pageview']);
         $autocapture     = !empty($opts['autocapture']);
-        if (empty($host) || empty($public_api_key)) return;
+        if (empty($host) || empty($public_api_key) || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') return;
+        $ui_host = ($opts['ui_host'] ?? '') ?: 'https://' . $region . '.posthog.com';
+        if (wp_parse_url($ui_host, PHP_URL_SCHEME) !== 'https') return;
+        $config = [
+            'api_host' => $host,
+            'ui_host' => $ui_host,
+            'capture_pageview' => $capture_pageview,
+            'autocapture' => $autocapture,
+        ];
+        if (!empty($opts['defaults'])) $config['defaults'] = $opts['defaults'];
+        if (in_array($opts['person_profiles'] ?? '', ['identified_only', 'always'], true)) {
+            $config['person_profiles'] = $opts['person_profiles'];
+        }
 
         // Build identify + register payloads if user is logged in
         $identify_js = '';
@@ -93,12 +109,7 @@ trait ArcWind_Init_PostHog_Trait {
         <!-- PostHog spårning (injekterad av ArcWind Init) -->
         <script>
 !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-posthog.init('<?php echo esc_js($public_api_key); ?>', {
-    api_host: '<?php echo esc_js($host); ?>',
-    ui_host: 'https://eu.posthog.com',
-    capture_pageview: <?php echo $capture_pageview ? 'true' : 'false'; ?>,
-    autocapture: <?php echo $autocapture ? 'true' : 'false'; ?>
-});
+posthog.init(<?php echo wp_json_encode($public_api_key); ?>, <?php echo wp_json_encode($config); ?>);
 <?php echo $register_js; ?>
 <?php echo $identify_js; ?>
         </script>

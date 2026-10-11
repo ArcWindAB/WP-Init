@@ -33,6 +33,7 @@ jobs:
           php tests/oneuptime-responses.php
           php tests/oneuptime-heartbeat.php
           php tests/github-updater.php
+          php tests/posthog-options.php
           node tests/tracker-js.js
       - name: Build and validate release ZIP
         run: python3 scripts/build-release.py

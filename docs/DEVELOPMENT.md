@@ -16,10 +16,11 @@ php tests/oneuptime-dates.php
 php tests/oneuptime-responses.php
 php tests/oneuptime-heartbeat.php
 php tests/github-updater.php
+php tests/posthog-options.php
 python3 scripts/build-release.py
 ```
 
-Svarstesterna använder fixtures med giltiga, nästlade och trasiga OneUptime-svar. De gör PHP-varningar till testfel och provar frontend-banner, adminmeddelanden, dashboard, frånkoppling, stale-data och backoff. Heartbeat-testet verifierar validering och att hemligheten inte visas i HTML. Updater-testet verifierar versionsjämförelse, release-format och API-fel.
+Svarstesterna använder fixtures med giltiga, nästlade och trasiga OneUptime-svar. De gör PHP-varningar till testfel och provar frontend-banner, adminmeddelanden, dashboard, frånkoppling, stale-data och backoff. Heartbeat-testet verifierar validering och att hemligheten inte visas i HTML. Updater-testet verifierar versionsjämförelse, release-format och API-fel. PostHog-testet verifierar region, reverse proxy, SDK-val och att okonfigurerade dashboard-kort inte registreras.
 
 `tests/wp-smoke.php` är avsett för en **isolerad WordPress-installation** med pluginet aktivt och körs med `wp eval-file tests/wp-smoke.php`. Det provar inställningar, dashboard, banner och externa fel via `pre_http_request`. Kör det inte mot produktionsdatabasen; det skriver till och återställer pluginets options.
 

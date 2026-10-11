@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) exit;
 trait ArcWind_Init_Settings_Trait {
     private function options() {
         $options = (array) get_option(self::OPTION_KEY, []);
-        foreach (['host', 'project_id', 'personal_api_key', 'public_api_key', 'load_position', 'feedback_uuid', 'error_distinct_id'] as $key) {
+        foreach (['host', 'project_id', 'personal_api_key', 'public_api_key', 'load_position', 'feedback_uuid', 'error_distinct_id', 'region', 'api_host', 'ui_host', 'defaults', 'person_profiles'] as $key) {
             if (isset($options[$key]) && !is_string($options[$key])) $options[$key] = '';
         }
         return $options;
@@ -32,6 +32,11 @@ trait ArcWind_Init_Settings_Trait {
                     'capture_pageview'   => 1,
                     'autocapture'        => 1,
                     'load_position'      => 'head', // head|footer
+                    'region'             => 'eu',
+                    'api_host'           => '',
+                    'ui_host'            => '',
+                    'defaults'           => '',
+                    'person_profiles'    => '',
 
                     // Feedback widget
                     'feedback_uuid'      => '',
@@ -71,6 +76,16 @@ trait ArcWind_Init_Settings_Trait {
             [$this, 'render_checkbox_enable_tracking'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_public_api_key', __('Public API Key (phc_...)', 'arcwind-init'),
             [$this, 'render_input_public_api_key'], 'arcwind_init_posthog', 'arcwind_init_frontend');
+        add_settings_field('arcwind_init_region', __('PostHog-region', 'arcwind-init'),
+            [$this, 'render_select_region'], 'arcwind_init_posthog', 'arcwind_init_frontend');
+        add_settings_field('arcwind_init_api_host', __('Webb-API / reverse proxy', 'arcwind-init'),
+            [$this, 'render_input_api_host'], 'arcwind_init_posthog', 'arcwind_init_frontend');
+        add_settings_field('arcwind_init_ui_host', __('PostHog UI-värd', 'arcwind-init'),
+            [$this, 'render_input_ui_host'], 'arcwind_init_posthog', 'arcwind_init_frontend');
+        add_settings_field('arcwind_init_defaults', __('SDK defaults', 'arcwind-init'),
+            [$this, 'render_input_defaults'], 'arcwind_init_posthog', 'arcwind_init_frontend');
+        add_settings_field('arcwind_init_person_profiles', __('Person profiles', 'arcwind-init'),
+            [$this, 'render_select_person_profiles'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_capture_pageview', __('Registrera sidvisning vid laddning', 'arcwind-init'),
             [$this, 'render_checkbox_capture_pageview'], 'arcwind_init_posthog', 'arcwind_init_frontend');
         add_settings_field('arcwind_init_autocapture', __('Autocapture (klick, formulär, m.m.)', 'arcwind-init'),
@@ -119,6 +134,12 @@ trait ArcWind_Init_Settings_Trait {
         $old = get_option(self::OPTION_KEY, []);
         $tab = isset($_POST['arcwind_init_active_tab']) && is_string($_POST['arcwind_init_active_tab']) ? sanitize_key(wp_unslash($_POST['arcwind_init_active_tab'])) : 'posthog';
         $input = is_array($input) ? $input : [];
+        // Keep the old browser host when an existing installation first gains
+        // the separate API host setting. New installations use the region host.
+        if (is_array($old) && !array_key_exists('api_host', $old) &&
+            !empty($old['host']) && empty($input['api_host']) && is_string($old['host'])) {
+            $input['api_host'] = $old['host'];
+        }
         $old = wp_parse_args((array) $old, ['feedback_enabled' => 1]);
         $input = array_merge($old, $input);
         $out = [];
@@ -134,6 +155,17 @@ trait ArcWind_Init_Settings_Trait {
         $out['capture_pageview']   = empty($input['capture_pageview']) ? 0 : 1;
         $out['autocapture']        = empty($input['autocapture']) ? 0 : 1;
         $out['load_position']      = in_array(($input['load_position'] ?? 'head'), ['head','footer'], true) ? ($input['load_position'] ?? 'head') : 'head';
+        $region = $input['region'] ?? 'eu';
+        $out['region']             = in_array($region, ['eu', 'us'], true) ? $region : 'eu';
+        foreach (['api_host', 'ui_host'] as $key) {
+            $url = isset($input[$key]) && is_string($input[$key]) ? esc_url_raw(trim($input[$key])) : '';
+            $parts = $url !== '' ? wp_parse_url($url) : false;
+            $out[$key] = is_array($parts) && ($parts['scheme'] ?? '') === 'https' && !empty($parts['host']) &&
+                !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['query']) && !isset($parts['fragment']) ? rtrim($url, '/') : '';
+        }
+        $defaults = isset($input['defaults']) && is_string($input['defaults']) ? trim($input['defaults']) : '';
+        $out['defaults'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', $defaults) && checkdate((int) substr($defaults, 5, 2), (int) substr($defaults, 8, 2), (int) substr($defaults, 0, 4)) ? $defaults : '';
+        $out['person_profiles'] = in_array(($input['person_profiles'] ?? ''), ['identified_only', 'always'], true) ? $input['person_profiles'] : '';
 
         // Feedback
         $out['feedback_enabled'] = empty($input['feedback_enabled']) ? 0 : 1;
@@ -200,6 +232,31 @@ trait ArcWind_Init_Settings_Trait {
     }
     public function render_input_public_api_key()    { $o = $this->options(); ?>
         <input type="text" style="width:420px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[public_api_key]" value="<?php echo esc_attr($o['public_api_key'] ?? ''); ?>" placeholder="phc_..." /><?php
+    }
+    public function render_select_region()           { $o = $this->options(); $region = $o['region'] ?? 'eu'; ?>
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[region]">
+            <option value="eu" <?php selected($region, 'eu'); ?>>EU</option>
+            <option value="us" <?php selected($region, 'us'); ?>>US</option>
+        </select><p class="description">Väljer standardvärde för UI-värden. Anpassade API-adresser ändras inte automatiskt.</p><?php
+    }
+    public function render_input_api_host()          { $o = $this->options(); ?>
+        <input type="url" style="width:420px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[api_host]" value="<?php echo esc_attr($o['api_host'] ?? ''); ?>" placeholder="https://events.example.com" />
+        <p class="description">PostHog <code>api_host</code> i webbläsaren. Ange en HTTPS reverse proxy, inklusive eventuell sökväg. Tomt använder vald regions direktadress. På äldre installationer behålls tidigare värd vid första sparningen.</p><?php
+    }
+    public function render_input_ui_host()           { $o = $this->options(); ?>
+        <input type="url" style="width:420px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ui_host]" value="<?php echo esc_attr($o['ui_host'] ?? ''); ?>" placeholder="https://eu.posthog.com" />
+        <p class="description">PostHog <code>ui_host</code> för toolbar och inloggning. Tomt använder vald region.</p><?php
+    }
+    public function render_input_defaults()          { $o = $this->options(); ?>
+        <input type="date" name="<?php echo esc_attr(self::OPTION_KEY); ?>[defaults]" value="<?php echo esc_attr($o['defaults'] ?? ''); ?>" />
+        <p class="description">PostHog <code>defaults</code>, till exempel <code>2026-05-30</code>. Tomt bevarar SDK:ns befintliga beteende.</p><?php
+    }
+    public function render_select_person_profiles()  { $o = $this->options(); $value = $o['person_profiles'] ?? ''; ?>
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[person_profiles]">
+            <option value="" <?php selected($value, ''); ?>>SDK-standard</option>
+            <option value="identified_only" <?php selected($value, 'identified_only'); ?>>Bara identifierade</option>
+            <option value="always" <?php selected($value, 'always'); ?>>Alltid</option>
+        </select><?php
     }
     public function render_checkbox_capture_pageview(){ $o = $this->options(); ?>
         <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[capture_pageview]" value="1" <?php checked(!empty($o['capture_pageview'])); ?> /> Kör <code>capture_pageview</code> vid laddning</label><?php

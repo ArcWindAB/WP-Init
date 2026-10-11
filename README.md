@@ -17,18 +17,23 @@ Release-ZIP-filen ska ha `arcwind-init/` som enda rotmapp, med `arcwind-init.php
 
 | Fält | Standard | Funktion |
 | --- | --- | --- |
-| PostHog-värd | `https://tel.arc.vin/_p` | HTTPS-värd för serverfrågor, capture och webbsnippet. |
+| PostHog-värd | `https://tel.arc.vin/_p` | HTTPS-värd för serverfrågor och capture. Äldre installationer fortsätter använda den som webbsnippets värd tills de väljer en separat Webb-API-adress. |
 | Project ID | tomt | Projekt för statistikwidgetens Query API. |
 | Personal API Key | tomt | Hemlig servernyckel för Query API. Visas inte i formuläret efter sparning; tomt fält behåller den, kryssrutan raderar den. |
 | Aktivera spårning | på | Laddar PostHog i frontend och wp-admin när publik nyckel finns. |
 | Public API Key | tomt | Publik `phc_...`-nyckel för webbläsare och server-side capture. |
+| PostHog-region | EU | Väljer direkta `api_host` (`eu.i.posthog.com` eller `us.i.posthog.com`) och `ui_host` (`eu.posthog.com` eller `us.posthog.com`) när egna adresser saknas. Ändra även servervärden om Query API ska byta region. |
+| Webb-API / reverse proxy | tomt | Valfri HTTPS-adress för webbsnippets `api_host`, inklusive eventuell sökväg. Tomt använder vald regions direktadress på nya installationer. Äldre installationers befintliga webbadress bevaras vid första sparning. Proxyn måste vidarebefordra både SDK-filer och eventanrop. |
+| PostHog UI-värd | tomt | Valfri HTTPS-adress för `ui_host`. Tomt använder vald region. Vid reverse proxy ska detta normalt vara PostHogs riktiga gränssnittsvärd. |
+| SDK defaults | tomt | Datum i formatet `YYYY-MM-DD`, t.ex. `2026-05-30`, som skickas som `defaults`. Tomt utelämnar inställningen och bevarar SDK:s tidigare beteende. |
+| Person profiles | SDK-standard | `identified_only` eller `always`; SDK-standard utelämnar inställningen. |
 | Registrera sidvisning | på | PostHogs `capture_pageview`. Verkar bara när spårningen är aktiv. |
 | Autocapture | på | PostHogs automatiska interaktionsspårning. Verkar bara när spårningen är aktiv. |
 | Laddningsposition | `head` | `head` eller `footer` i frontend och admin. |
 | Aktivera felspårning | på | Skickar pluginets generiska felhändelser via server-side capture när publik nyckel finns. |
 | Distinct ID för fel | `arcwind-init:server` | ID för dessa serverhändelser. |
 
-**Statistik** på WordPress dashboard visar unika användare och sidvisningar för sju dagar. Den frågar PostHogs Query API och cachelagrar i tio minuter. Saknad konfiguration ger ett informationsmeddelande; API-fel ger tomma värden och kort felcache. Feltexter återger inte API-svar eller nycklar. Manuell cache-rensning finns under Diagnostik.
+**Statistik** på WordPress dashboard visas först när HTTPS-värd, Project ID och Personal API Key finns. Den visar unika användare och sidvisningar för sju dagar, frågar PostHogs Query API och cachelagrar i tio minuter. API-fel ger tomma värden och kort felcache. Feltexter återger inte API-svar eller nycklar. Manuell cache-rensning finns under Diagnostik.
 
 Webbsnippet laddas bara när spårning är aktiverad och den publika nyckeln finns. Inloggade användare identifieras med WordPress-användar-ID och attribut som visningsnamn, användarnamn, roller, administratörsstatus och SHA-256-hash av e-post. Även admin-sidor omfattas. Bedöm därför rättslig grund, information till användare och eventuellt samtycke för er webbplats innan spårningen aktiveras. Pluginet innehåller ingen egen samtyckeshanterare.
 
@@ -49,7 +54,7 @@ ArcWind_Init_Tracker::capture('report_generated', ['kind' => 'weekly'], 'example
 | Aktivera feedback | på | Visar feedback-widgeten på WordPress dashboard. |
 | Feedback-UUID | tomt | Alfanumeriskt ID som bygger länken `https://t.arc.vin/s/UUID`. |
 
-Widgeten öppnar formuläret i en ny flik. Den bäddar inte in tredjepartsskript på publika sidor. Utan UUID visas en länk till inställningarna. UUID och PostHog-inställningar behålls när andra flikar sparas.
+Widgeten visas först när feedback är aktiverad och ett giltigt UUID finns. Den öppnar formuläret i en ny flik och bäddar inte in tredjepartsskript på publika sidor. UUID och PostHog-inställningar behålls när andra flikar sparas.
 
 ### OneUptime
 

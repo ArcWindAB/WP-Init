@@ -41,6 +41,11 @@ try {
         $html = ob_get_clean();
         arcwind_smoke_check(strpos($html, 'ArcWind Init') !== false, 'Settings tab did not render: ' . $tab);
         arcwind_smoke_check(strpos($html, 'secret-token') === false, 'Settings page leaked a secret: ' . $tab);
+        if ($tab === 'posthog') {
+            foreach (['api_host', 'ui_host', 'region', 'defaults', 'person_profiles'] as $field) {
+                arcwind_smoke_check(strpos($html, 'arcwind_init_settings[' . $field . ']') !== false, 'PostHog field missing: ' . $field);
+            }
+        }
     }
     ArcWind_Init_OneUptime::activate();
     arcwind_smoke_check(wp_next_scheduled(ArcWind_Init_OneUptime::HOOK) !== false, 'Heartbeat was not scheduled');
