@@ -105,18 +105,14 @@ class ArcWind_Init_OneUptime_Dashboard {
         $host = 'https://' . $url['host'] . (!empty($url['port']) ? ':' . (int) $url['port'] : '');
         $endpoint = $host . '/status-page-api/uptime/' . rawurlencode($options['status_page_id']);
         $now = time();
-        $windows = [];
-        foreach (['24h' => DAY_IN_SECONDS, '7d' => 7 * DAY_IN_SECONDS, '30d' => 30 * DAY_IN_SECONDS] as $name => $seconds) {
-            $payload = ArcWind_Init_OneUptime::request_api($endpoint, 'uptime-' . $name, 'POST', 5, [
-                'startDate' => gmdate('c', $now - $seconds), 'endDate' => gmdate('c', $now),
-            ]);
-            if (!is_wp_error($payload)) $windows[$name] = $payload;
-        }
-        if (!$windows) {
+        $payload = ArcWind_Init_OneUptime::request_api($endpoint, 'uptime-7d', 'POST', 5, [
+            'startDate' => gmdate('c', $now - 7 * DAY_IN_SECONDS), 'endDate' => gmdate('c', $now),
+        ]);
+        if (is_wp_error($payload)) {
             set_transient(self::HISTORY_FAILURE, 1, MINUTE_IN_SECONDS);
             return;
         }
-        $result = ['windows' => $windows, 'fetched_at' => $now, 'stale' => false];
+        $result = ['windows' => ['7d' => $payload], 'fetched_at' => $now, 'stale' => false];
         set_transient(self::HISTORY_CACHE, $result, 10 * MINUTE_IN_SECONDS);
         set_transient(self::HISTORY_LAST_GOOD, $result, DAY_IN_SECONDS);
     }
@@ -192,21 +188,15 @@ class ArcWind_Init_OneUptime_Dashboard {
 
     private function render_history($entity, $is_group = false) {
         if (!is_array($this->history_data) || empty($this->history_data['windows'])) return;
-        echo '<div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:11px;color:#646970">';
-        foreach (['24h' => '24 timmar', '7d' => '7 dagar', '30d' => '30 dagar'] as $key => $label) {
-            $payload = $this->history_data['windows'][$key] ?? null;
-            $wrapped = is_array($payload) ? ['_arcwindUptime' => $payload] : [];
-            $record = $is_group ? $this->group_uptime_record($this->normalize_id($entity['_id'] ?? $entity['id'] ?? ''), $wrapped) : $this->uptime_record($entity, $wrapped);
-            $value = is_array($record) ? ($record['uptimePercent'] ?? null) : null;
-            echo '<span>' . esc_html($label) . ': ';
-            if (is_scalar($value) && is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 100) {
-                $percent = (float) $value;
-                echo '<span role="progressbar" aria-label="Drifttid ' . esc_attr($label) . '" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' . esc_attr((string) $percent) . '" style="display:inline-block;width:46px;height:7px;background:#dcdcde;vertical-align:middle"><span style="display:block;width:' . esc_attr((string) $percent) . '%;height:100%;background:#237a45"></span></span> ';
-                echo esc_html(number_format_i18n($percent, 2)) . '%';
-            } else echo 'saknas';
-            echo '</span>';
-        }
-        echo '</div>';
+        $payload = $this->history_data['windows']['7d'] ?? null;
+        $wrapped = is_array($payload) ? ['_arcwindUptime' => $payload] : [];
+        $record = $is_group ? $this->group_uptime_record($this->normalize_id($entity['_id'] ?? $entity['id'] ?? ''), $wrapped) : $this->uptime_record($entity, $wrapped);
+        $value = is_array($record) ? ($record['uptimePercent'] ?? null) : null;
+        echo '<small style="display:block;color:#646970">Senaste 7 dagarna: ';
+        if (is_scalar($value) && is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 100) {
+            echo esc_html(number_format_i18n((float) $value, 2)) . '% drifttid';
+        } else echo 'uppgift saknas';
+        echo '</small>';
     }
 
     private function resource_status($resource, $data) {
@@ -295,19 +285,15 @@ class ArcWind_Init_OneUptime_Dashboard {
         echo '<div style="margin-left:16px">';
         foreach ($resources as $resource) {
             $name = $this->label($resource['displayName'] ?? null, $this->label($resource['name'] ?? null, $this->label($resource)));
-            echo '<details style="border-bottom:1px solid #eee"><summary style="cursor:pointer;padding:7px 0"><span style="display:inline-flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;width:calc(100% - 20px);vertical-align:top">';
+            echo '<div style="border-bottom:1px solid #eee;padding:7px 0"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px">';
             echo '<span style="min-width:0;overflow-wrap:anywhere">' . esc_html($name) . '</span>';
             $status = $this->resource_status($resource, $data);
             echo '<span>';
             if ($status) $this->colored_status($status, $stale);
             else echo '–';
-            echo '</span></span></summary><div style="padding:0 0 8px 18px;color:#646970">';
-            $uptime = $this->uptime_record($resource, $data);
-            if ($uptime && isset($uptime['uptimePercent']) && is_scalar($uptime['uptimePercent']) && is_numeric($uptime['uptimePercent'])) {
-                echo '<div>' . esc_html(number_format_i18n((float) $uptime['uptimePercent'], 2)) . '% drifttid</div>';
-            } else echo '<div>Drifttid: uppgift saknas</div>';
+            echo '</span></div>';
             $this->render_history($resource);
-            echo '</div></details>';
+            echo '</div>';
         }
         echo '</div>';
     }
