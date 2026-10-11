@@ -24,6 +24,11 @@ class ArcWind_Init_Diagnostics {
             $result = [__('Cache rensad.', 'arcwind-init')];
         } elseif ($task === 'test') {
             $result = $this->test_connections();
+        } elseif ($task === 'clear_log') {
+            $confirmed = isset($_POST['confirm_clear_log']) && $_POST['confirm_clear_log'] === 'yes';
+            $result = $confirmed && class_exists('ArcWind_Init_Error_Log') && ArcWind_Init_Error_Log::clear()
+                ? [__('Felloggen har rensats.', 'arcwind-init')]
+                : [__('Felloggen kunde inte rensas.', 'arcwind-init')];
         } else {
             $result = [__('Ogiltig åtgärd.', 'arcwind-init')];
         }
@@ -33,6 +38,7 @@ class ArcWind_Init_Diagnostics {
     }
 
     public function test_connections() {
+        if (!current_user_can('manage_options')) return [];
         $result = [];
         $settings = (array) get_option(ArcWind_Init::OPTION_KEY, []);
         $region = ($settings['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
@@ -42,6 +48,7 @@ class ArcWind_Init_Diagnostics {
         $key = is_string($settings['personal_api_key'] ?? null) ? $settings['personal_api_key'] : '';
         if (!$host || !$project || !$key || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {
             $result[] = __('PostHog: ofullständig eller ogiltig konfiguration.', 'arcwind-init');
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('PostHog', 'connection-test', 'warning', 'configuration');
         } else {
             try {
                 $response = wp_safe_remote_post($host . '/api/projects/' . rawurlencode($project) . '/query/', [
@@ -55,13 +62,26 @@ class ArcWind_Init_Diagnostics {
                     $ok = is_array($body) && isset($body['results']) && is_array($body['results']);
                 }
                 $result[] = $ok ? __('PostHog: anslutningen fungerar.', 'arcwind-init') : __('PostHog: anslutningen eller API-svaret misslyckades.', 'arcwind-init');
+                if (class_exists('ArcWind_Init_Error_Log')) {
+                    if ($ok) ArcWind_Init_Error_Log::recover('PostHog', 'connection-test');
+                    elseif (is_wp_error($response)) ArcWind_Init_Error_Log::record('PostHog', 'connection-test', 'error', ArcWind_Init_Error_Log::transport_code($response));
+                    else {
+                        $status = is_array($response) ? wp_remote_retrieve_response_code($response) : 0;
+                        $code = $status === 200 ? 'format' : (in_array($status, [401, 403], true) ? 'authentication' : 'http');
+                        ArcWind_Init_Error_Log::record('PostHog', 'connection-test', 'error', $code, ['http_status' => $status]);
+                    }
+                }
             } catch (Throwable $error) {
                 $result[] = __('PostHog: anslutningen misslyckades.', 'arcwind-init');
+                if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('PostHog', 'connection-test', 'error', 'transport');
             }
         }
 
         $uuid = $settings['feedback_uuid'] ?? '';
         $result[] = is_string($uuid) && preg_match('/^[A-Za-z0-9]+$/', $uuid) ? __('Feedback: giltig UUID-konfiguration.', 'arcwind-init') : __('Feedback: UUID saknas eller är ogiltig.', 'arcwind-init');
+        if (!empty($settings['feedback_enabled']) && (!is_string($uuid) || !preg_match('/^[A-Za-z0-9]+$/', $uuid)) && class_exists('ArcWind_Init_Error_Log')) {
+            ArcWind_Init_Error_Log::record('Feedback', 'connection-test', 'warning', 'configuration');
+        }
 
         $oneuptime = ArcWind_Init_OneUptime::options();
         $status_url = ArcWind_Init_OneUptime::api_text($oneuptime['status_url'] ?? '');
@@ -69,15 +89,21 @@ class ArcWind_Init_Diagnostics {
         $parts = $status_url ? wp_parse_url($status_url) : false;
         if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) || !$page_id) {
             $result[] = __('OneUptime: status-URL eller sid-ID saknas.', 'arcwind-init');
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'connection-test', 'warning', 'configuration');
         } else {
             $base = 'https://' . $parts['host'] . (!empty($parts['port']) ? ':' . (int) $parts['port'] : '');
             $data = ArcWind_Init_OneUptime::request_api($base . '/status-page-api/overview/' . rawurlencode($page_id), 'diagnostic-overview');
             $result[] = !is_wp_error($data) && array_key_exists('overallStatus', $data) ? __('OneUptime: status-API fungerar.', 'arcwind-init') : __('OneUptime: status-API kunde inte läsas.', 'arcwind-init');
+            if (class_exists('ArcWind_Init_Error_Log')) {
+                if (!is_wp_error($data) && array_key_exists('overallStatus', $data)) ArcWind_Init_Error_Log::recover('OneUptime', 'connection-test');
+                elseif (!is_wp_error($data)) ArcWind_Init_Error_Log::record('OneUptime', 'connection-test', 'error', 'format');
+            }
         }
         return $result;
     }
 
     public function render() {
+        if (!current_user_can('manage_options')) return;
         $settings = (array) get_option(ArcWind_Init::OPTION_KEY, []);
         $oneuptime = ArcWind_Init_OneUptime::options();
         $health = get_option(ArcWind_Init_OneUptime::HEARTBEAT_HEALTH, []);
@@ -110,5 +136,39 @@ class ArcWind_Init_Diagnostics {
         echo '<input type="hidden" name="action" value="arcwind_init_diagnostics">';
         echo '<button class="button button-primary" type="submit" name="diagnostic_task" value="test">' . esc_html__('Testa anslutningar', 'arcwind-init') . '</button> ';
         echo '<button class="button" type="submit" name="diagnostic_task" value="clear">' . esc_html__('Rensa cache', 'arcwind-init') . '</button></form>';
+        $this->render_log();
+    }
+
+    private function render_log() {
+        echo '<section id="arcwind-error-log"><h2>' . esc_html__('Fellogg', 'arcwind-init') . '</h2>';
+        echo '<p>' . esc_html__('Loggen sparar högst 100 händelser i 30 dagar. Upprepade fel räknas samman. Tider visas i webbplatsens tidszon.', 'arcwind-init') . '</p>';
+        $source = isset($_GET['log_source']) && is_string($_GET['log_source']) ? sanitize_key(wp_unslash($_GET['log_source'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only filter.
+        $severity = isset($_GET['log_severity']) && is_string($_GET['log_severity']) ? sanitize_key(wp_unslash($_GET['log_severity'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only filter.
+        echo '<form method="get"><input type="hidden" name="page" value="arcwind_init"><input type="hidden" name="tab" value="diagnostics">';
+        echo '<label for="arcwind-log-source">' . esc_html__('Integration', 'arcwind-init') . '</label> <select id="arcwind-log-source" name="log_source"><option value="">' . esc_html__('Alla', 'arcwind-init') . '</option>';
+        foreach (['posthog' => 'PostHog', 'oneuptime' => 'OneUptime', 'feedback' => 'Feedback', 'github' => 'GitHub', 'diagnostics' => 'Diagnostics'] as $value => $label) {
+            echo '<option value="' . esc_attr($value) . '"' . selected($source, $value, false) . '>' . esc_html($label) . '</option>';
+        }
+        echo '</select> <label for="arcwind-log-severity">' . esc_html__('Allvarlighetsgrad', 'arcwind-init') . '</label> <select id="arcwind-log-severity" name="log_severity"><option value="">' . esc_html__('Alla', 'arcwind-init') . '</option>';
+        foreach (['info' => __('Information', 'arcwind-init'), 'warning' => __('Varning', 'arcwind-init'), 'error' => __('Fel', 'arcwind-init'), 'critical' => __('Kritiskt', 'arcwind-init')] as $value => $label) {
+            echo '<option value="' . esc_attr($value) . '"' . selected($severity, $value, false) . '>' . esc_html($label) . '</option>';
+        }
+        echo '</select> <button class="button" type="submit">' . esc_html__('Filtrera', 'arcwind-init') . '</button></form>';
+        $rows = class_exists('ArcWind_Init_Error_Log') ? array_reverse(ArcWind_Init_Error_Log::entries()) : [];
+        $shown = 0;
+        foreach ($rows as $row) {
+            if ($source !== '' && $source !== sanitize_key($row['source'] ?? '')) continue;
+            if ($severity !== '' && $severity !== ($row['severity'] ?? '')) continue;
+            ++$shown;
+            $date = wp_date('Y-m-d H:i:s', (int) $row['last']);
+            echo '<article class="notice notice-' . esc_attr(($row['severity'] ?? '') === 'info' ? 'success' : 'warning') . ' inline" style="margin:12px 0;padding:8px 12px">';
+            $severity_labels = ['info' => __('Information', 'arcwind-init'), 'warning' => __('Varning', 'arcwind-init'), 'error' => __('Fel', 'arcwind-init'), 'critical' => __('Kritiskt', 'arcwind-init')];
+            echo '<strong>' . esc_html($row['source']) . '</strong> · <time datetime="' . esc_attr(gmdate('c', (int) $row['last'])) . '">' . esc_html($date) . '</time> · ' . esc_html($severity_labels[$row['severity']] ?? $row['severity']) . '<p>' . esc_html(ArcWind_Init_Error_Log::description($row['code'])) . ' ' . esc_html(ArcWind_Init_Error_Log::remedy($row['code'])) . '</p>';
+            echo '<details><summary>' . esc_html__('Teknisk information', 'arcwind-init') . '</summary><p><code>' . esc_html($row['action'] . ' / ' . $row['code'] . (isset($row['context']['http_status']) ? ' / HTTP ' . $row['context']['http_status'] : '')) . '</code></p><p>' . esc_html__('Första förekomst:', 'arcwind-init') . ' ' . esc_html(wp_date('Y-m-d H:i:s', (int) $row['first'])) . ' · ' . esc_html__('Antal:', 'arcwind-init') . ' ' . esc_html((string) $row['count']) . '</p></details></article>';
+        }
+        if (!$shown) echo '<p>' . esc_html($source === '' && $severity === '' ? __('Inga fel har registrerats under de senaste 30 dagarna.', 'arcwind-init') : __('Inga loggposter matchar urvalet.', 'arcwind-init')) . '</p>';
+        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" onsubmit="return confirm(' . esc_attr(wp_json_encode(__('Vill du rensa felloggen?', 'arcwind-init'))) . ')">';
+        wp_nonce_field('arcwind_init_diagnostics');
+        echo '<input type="hidden" name="action" value="arcwind_init_diagnostics"><input type="hidden" name="confirm_clear_log" value="yes"><button class="button" type="submit" name="diagnostic_task" value="clear_log">' . esc_html__('Rensa fellogg', 'arcwind-init') . '</button></form></section>';
     }
 }

@@ -2,6 +2,8 @@ name: Validate plugin
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -39,6 +41,7 @@ jobs:
           php tests/oneuptime-heartbeat.php
           php tests/github-updater.php
           php tests/posthog-options.php
+          php tests/error-log.php
           node tests/tracker-js.js
       - name: Build and validate release ZIP
         run: python3 scripts/build-release.py

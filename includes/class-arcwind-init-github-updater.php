@@ -109,18 +109,18 @@ class ArcWind_Init_GitHub_Updater {
         }
 
         if (!is_string($source) || !is_file(trailingslashit($source) . 'arcwind-init.php')) {
-            return new WP_Error('invalid_package', __('Uppdateringspaketet saknar pluginfilen.', 'arcwind-init'));
+            return self::package_error('invalid_package', __('Uppdateringspaketet saknar pluginfilen.', 'arcwind-init'));
         }
         $header = get_file_data(trailingslashit($source) . 'arcwind-init.php', ['Version' => 'Version'], 'plugin');
         if (empty($header['Version']) || !preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $header['Version'])) {
-            return new WP_Error('invalid_package', __('Uppdateringspaketet har ogiltig version.', 'arcwind-init'));
+            return self::package_error('invalid_package', __('Uppdateringspaketet har ogiltig version.', 'arcwind-init'));
         }
         // A manual ZIP install may intentionally restore an older version. Match the
         // cached release only for WordPress update jobs, never for manual recovery.
         $release = get_transient(self::CACHE_KEY);
         if (($hook_extra['action'] ?? '') === 'update' && is_array($release) &&
             !empty($release['version']) && $header['Version'] !== $release['version']) {
-            return new WP_Error('invalid_package', __('Uppdateringspaketets version stämmer inte med releasen.', 'arcwind-init'));
+            return self::package_error('invalid_package', __('Uppdateringspaketets version stämmer inte med releasen.', 'arcwind-init'));
         }
         // Keep the package in WordPress's upgrade working directory. Core must
         // back up and replace the installed plugin itself for rollback to work.
@@ -132,18 +132,23 @@ class ArcWind_Init_GitHub_Updater {
 
         global $wp_filesystem;
         if (!$wp_filesystem) {
-            return new WP_Error('filesystem_unavailable', __('WordPress filsystem är inte tillgängligt.', 'arcwind-init'));
+            return self::package_error('filesystem_unavailable', __('WordPress filsystem är inte tillgängligt.', 'arcwind-init'));
         }
 
         if ($wp_filesystem->exists($desired)) {
-            return new WP_Error('invalid_package', __('Uppdateringens arbetskatalog är redan upptagen.', 'arcwind-init'));
+            return self::package_error('invalid_package', __('Uppdateringens arbetskatalog är redan upptagen.', 'arcwind-init'));
         }
 
         if ($wp_filesystem->move($source, $desired, false)) {
             return $desired;
         }
 
-        return new WP_Error('invalid_package', __('Uppdateringspaketet kunde inte installeras.', 'arcwind-init'));
+        return self::package_error('invalid_package', __('Uppdateringspaketet kunde inte installeras.', 'arcwind-init'));
+    }
+
+    private static function package_error($code, $message) {
+        if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('GitHub', 'package', 'error', 'package');
+        return new WP_Error($code, $message);
     }
 
     private function get_latest_release() {
@@ -167,6 +172,7 @@ class ArcWind_Init_GitHub_Updater {
         }
 
         if (is_wp_error($response) || !is_array($response)) {
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('GitHub', 'release-check', 'error', is_wp_error($response) ? ArcWind_Init_Error_Log::transport_code($response) : 'transport');
             set_transient(self::CACHE_KEY, [], self::FAILURE_TTL);
             return [];
         }
@@ -175,6 +181,7 @@ class ArcWind_Init_GitHub_Updater {
         $body = wp_remote_retrieve_body($response);
 
         if ($code !== 200 || !is_string($body) || $body === '') {
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('GitHub', 'release-check', 'error', in_array($code, [401, 403], true) ? 'authentication' : 'http', ['http_status' => $code]);
             set_transient(self::CACHE_KEY, [], self::FAILURE_TTL);
             return [];
         }
@@ -182,11 +189,13 @@ class ArcWind_Init_GitHub_Updater {
         $json = json_decode($body, true);
         $release = self::parse_release($json);
         if (!$release) {
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('GitHub', 'release-check', 'error', 'format');
             set_transient(self::CACHE_KEY, [], self::FAILURE_TTL);
             return [];
         }
 
         set_transient(self::CACHE_KEY, $release, self::CACHE_TTL);
+        if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::recover('GitHub', 'release-check');
         return $release;
     }
 

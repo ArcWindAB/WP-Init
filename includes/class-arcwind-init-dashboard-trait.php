@@ -49,10 +49,19 @@ trait ArcWind_Init_Dashboard_Trait {
 
         if (false === $data) {
             if (!wp_next_scheduled('arcwind_init_refresh_posthog_stats')) {
-                wp_schedule_single_event(time(), 'arcwind_init_refresh_posthog_stats');
+                if (!wp_schedule_single_event(time(), 'arcwind_init_refresh_posthog_stats') && class_exists('ArcWind_Init_Error_Log')) {
+                    ArcWind_Init_Error_Log::record('PostHog', 'dashboard-refresh', 'error', 'schedule');
+                }
                 if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
             }
             $data = ['active_7d' => null, 'pageviews_7d' => null, 'fetched_at' => __('väntar på hämtning', 'arcwind-init')];
+        }
+
+        if (!empty($data['errors'])) {
+            echo '<p role="status">' . esc_html__('Statistiken kunde inte hämtas. Kontrollera PostHog-anslutningen.', 'arcwind-init') . '</p>';
+            if (current_user_can('manage_options')) echo '<p><a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=diagnostics#arcwind-error-log')) . '">' . esc_html__('Visa diagnostik och fellogg', 'arcwind-init') . '</a></p>';
+        } elseif ($data['active_7d'] === null && $data['pageviews_7d'] === null) {
+            echo '<p role="status">' . esc_html__('Statistiken väntar på första hämtningen.', 'arcwind-init') . '</p>';
         }
 
         echo '<div class="arcwind-grid">';
@@ -65,7 +74,10 @@ trait ArcWind_Init_Dashboard_Trait {
 
     public function refresh_posthog_stats() {
         $opts = $this->options();
-        if (empty($opts['project_id']) || empty($opts['personal_api_key'])) return;
+        if (empty($opts['project_id']) || empty($opts['personal_api_key'])) {
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('PostHog', 'dashboard-refresh', 'warning', 'configuration');
+            return;
+        }
         $errors = [];
         $active_7d = $this->fetch_scalar(
             'SELECT count(DISTINCT distinct_id) AS c FROM events WHERE timestamp >= now() - INTERVAL 7 DAY',
@@ -82,6 +94,7 @@ trait ArcWind_Init_Dashboard_Trait {
             'fetched_at' => current_time('mysql'),
         ], empty($errors) ? 10 * MINUTE_IN_SECONDS : MINUTE_IN_SECONDS);
         if ($errors) set_transient(self::ERR_TRANSIENT, $errors, self::ERR_TTL);
+        elseif (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::recover('PostHog', 'dashboard-query');
     }
 
     private function render_stat_card($title, $value) {
@@ -103,6 +116,7 @@ trait ArcWind_Init_Dashboard_Trait {
         $res = $this->query_posthog($hogql, $errors);
         if (!$res || empty($res['results']) || !is_array($res['results'])) {
             $errors[] = __('Statistikfrågan gav inget resultat.', 'arcwind-init');
+            if ($res && class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('PostHog', 'dashboard-query', 'error', 'format');
             return null;
         }
         $first = $res['results'][0] ?? null;
@@ -123,6 +137,7 @@ trait ArcWind_Init_Dashboard_Trait {
 
         if (empty($host) || empty($project_id) || empty($api_key) || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {
             $errors[] = __('Saknad konfiguration.', 'arcwind-init');
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('PostHog', 'dashboard-query', 'warning', 'configuration');
             return null;
         }
 
@@ -157,7 +172,8 @@ trait ArcWind_Init_Dashboard_Trait {
         if (is_wp_error($resp) || !is_array($resp)) {
             $msg = __('PostHog kunde inte nås.', 'arcwind-init');
             $errors[] = $msg;
-            $this->capture_error('http_error', $msg);
+            $transport = is_wp_error($resp) && class_exists('ArcWind_Init_Error_Log') ? ArcWind_Init_Error_Log::transport_code($resp) : 'transport';
+            $this->capture_error('http_error', $msg, ['transport' => $transport]);
             return null;
         }
 
@@ -201,6 +217,12 @@ trait ArcWind_Init_Dashboard_Trait {
     }
 
     private function capture_error($kind, $message, $props = []) {
+        if (class_exists('ArcWind_Init_Error_Log')) {
+            $status = isset($props['status']) && is_int($props['status']) ? $props['status'] : 0;
+            $code = $kind === 'api_error' ? (in_array($status, [401, 403], true) ? 'authentication' : 'http') :
+                (in_array($kind, ['json_error', 'shape_error'], true) ? 'format' : ($props['transport'] ?? 'transport'));
+            ArcWind_Init_Error_Log::record('PostHog', 'dashboard-query', 'error', $code, ['http_status' => $status]);
+        }
         $opts = $this->options();
         if (empty($opts['enable_error_tracking'])) {
             return;

@@ -245,7 +245,9 @@ class ArcWind_Init_OneUptime {
         $options = self::options();
         if (!empty($options['enabled']) && !empty($options['heartbeat_enabled']) &&
             self::valid_heartbeat_url(self::api_text($options['heartbeat_url'] ?? ''))) {
-            wp_schedule_event(time() + 60, 'arcwind_every_minute', self::HOOK);
+            if (!wp_schedule_event(time() + 60, 'arcwind_every_minute', self::HOOK) && class_exists('ArcWind_Init_Error_Log')) {
+                ArcWind_Init_Error_Log::record('OneUptime', 'heartbeat', 'error', 'schedule');
+            }
         }
     }
 
@@ -263,6 +265,7 @@ class ArcWind_Init_OneUptime {
 
     public static function uninstall() {
         self::deactivate();
+        if (class_exists('ArcWind_Init_Error_Log')) delete_option(ArcWind_Init_Error_Log::OPTION);
         delete_option(self::KEY);
         delete_option(self::HEARTBEAT_HEALTH);
         delete_transient(self::CACHE);
@@ -294,7 +297,9 @@ class ArcWind_Init_OneUptime {
         if (!$active && $event) wp_clear_scheduled_hook(self::HOOK);
         if ($active && (!$event || $event->schedule !== 'arcwind_every_minute')) {
             wp_clear_scheduled_hook(self::HOOK);
-            wp_schedule_event(time() + 60, 'arcwind_every_minute', self::HOOK);
+            if (!wp_schedule_event(time() + 60, 'arcwind_every_minute', self::HOOK) && class_exists('ArcWind_Init_Error_Log')) {
+                ArcWind_Init_Error_Log::record('OneUptime', 'heartbeat', 'error', 'schedule');
+            }
         }
     }
 
@@ -314,12 +319,13 @@ class ArcWind_Init_OneUptime {
                     'timeout' => 5, 'redirection' => 0, 'sslverify' => true,
                 ]);
                 if (is_wp_error($response) || !is_array($response)) {
-                    self::api_diagnostic('heartbeat', 'request failed');
+                    self::api_diagnostic('heartbeat', 'request failed', $response);
                 } else {
                     $code = wp_remote_retrieve_response_code($response);
                     if (is_int($code) && $code >= 200 && $code < 300) {
                         $health['last_success'] = $health['last_attempt'];
                         $health['status'] = 'ok';
+                        if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::recover('OneUptime', 'heartbeat');
                     } else {
                         self::api_diagnostic('heartbeat', 'HTTP ' . (is_int($code) ? $code : 'unknown'));
                     }
@@ -429,7 +435,7 @@ class ArcWind_Init_OneUptime {
             return new WP_Error('api_unavailable', __('OneUptime kunde inte nås.', 'arcwind-init'));
         }
         if (is_wp_error($response) || !is_array($response)) {
-            self::api_diagnostic($endpoint, 'request failed');
+            self::api_diagnostic($endpoint, 'request failed', $response);
             return new WP_Error('api_unavailable', __('OneUptime kunde inte nås.', 'arcwind-init'));
         }
         $code = wp_remote_retrieve_response_code($response);
@@ -439,12 +445,25 @@ class ArcWind_Init_OneUptime {
         }
         $data = self::parse_api_json(wp_remote_retrieve_body($response));
         if (is_wp_error($data)) self::api_diagnostic($endpoint, $data->get_error_code());
+        elseif (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::recover('OneUptime', $endpoint);
         return $data;
     }
 
-    public static function api_diagnostic($endpoint, $reason) {
-        // Never log response bodies, URLs, or heartbeat secrets.
-        error_log('ArcWind Init OneUptime ' . $endpoint . ': ' . $reason);
+    public static function api_diagnostic($endpoint, $reason, $transport_error = null) {
+        // Accept only fixed categories. Never retain remote messages, URLs, or secrets.
+        if (!class_exists('ArcWind_Init_Error_Log')) return;
+        $context = [];
+        if (preg_match('/^HTTP ([1-5][0-9]{2})$/', (string) $reason, $match)) {
+            $context['http_status'] = (int) $match[1];
+            $code = in_array($context['http_status'], [401, 403], true) ? 'authentication' : 'http';
+        } elseif (in_array($reason, ['invalid URL'], true)) {
+            $code = 'configuration';
+        } elseif (in_array($reason, ['request failed', 'request exception'], true)) {
+            $code = is_wp_error($transport_error) ? ArcWind_Init_Error_Log::transport_code($transport_error) : 'transport';
+        } else {
+            $code = 'format';
+        }
+        ArcWind_Init_Error_Log::record('OneUptime', $endpoint, 'error', $code, $context);
     }
 
     private function active_messages($place) {
@@ -542,7 +561,7 @@ class ArcWind_Init_OneUptime {
             return null;
         }
         if (is_wp_error($response) || !is_array($response)) {
-            self::api_diagnostic($resource, 'request failed');
+            self::api_diagnostic($resource, 'request failed', $response);
             return null;
         }
         $code = wp_remote_retrieve_response_code($response);

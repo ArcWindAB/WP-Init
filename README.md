@@ -100,6 +100,10 @@ Om `DISABLE_WP_CRON` är aktiv måste en extern cron finnas. Diagnostik varnar o
 
 Fliken **Diagnostik** visar aktiverings- och konfigurationsstatus för integrationerna, PHP-version, senaste heartbeat, nästa cron-tid och varning om försenad cron. Endast administratörer med `manage_options` får köra **Testa anslutningar** och **Rensa cache**. Åtgärderna kräver WordPress nonce. Testresultat är generiska och innehåller inte API-nycklar, token eller privata svarskroppar. Testet utför nätverksanrop bara när en administratör trycker på knappen.
 
+**Fellogg** under Diagnostik visar fel från PostHog, OneUptime och GitHub-uppdateraren. Varje post visar webbplatsens lokala tid, integration, allvarlighetsgrad, feltyp, rekommenderad åtgärd och öppningsbar teknisk information. Filtrera efter integration eller allvarlighetsgrad. Likadana fel sammanförs med första och senaste tid samt antal förekomster. Loggen lagras lokalt i en WordPress option utan automatisk sidladdning, med högst 100 poster och 30 dagars lagring. Administratörer kan rensa den med en bekräftad, nonce-skyddad åtgärd. Andra användare kan inte läsa eller rensa den. Loggen lagrar inte nycklar, token, råa API-svar, fullständiga URL:er eller personuppgifter. Om loggning misslyckas fortsätter webbplatsen att fungera.
+
+Statistik- och statuskort skiljer väntan på första hämtning från fel och äldre data. Vid fel får administratörer en länk till Diagnostik. Andra användare ser ingen länk till felloggen.
+
 ## Uppdateringar från GitHub Releases
 
 Pluginfilen har `Update URI: https://github.com/ArcWindAB/WP-Init`. Uppdateraren använder WordPress filter för tillägg med egen Update URI. Informationsrutan för tillägget visar funktioner, installation, vanliga frågor och releasens versionsnyheter; grundinformationen finns kvar även när GitHub inte svarar. Uppdateraren läser den senaste publicerade GitHub-releasen, avvisar utkast och releaser markerade som förhandsversioner och kräver en semantisk versionstagg samt ett HTTPS-asset som heter `arcwind-init.zip` på rätt repo. En uppdatering erbjuds först om versionen är nyare än den installerade. Lyckade svar cachas i en timme; API-fel och rate limits i 15 minuter. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.
@@ -109,7 +113,7 @@ Inställningar lagras i WordPress options och överlever filuppdateringar. En fe
 Bygg och validera en release lokalt:
 
 ```sh
-python3 scripts/build-release.py --tag v2.0.1
+python3 scripts/build-release.py --tag v2.1.0
 python3 scripts/build-release.py --validate-only
 ```
 

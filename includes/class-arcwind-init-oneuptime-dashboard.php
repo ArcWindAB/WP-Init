@@ -43,7 +43,7 @@ class ArcWind_Init_OneUptime_Dashboard {
         if (is_array($cached) && isset($cached['data']) && is_array($cached['data'])) return $cached;
         if (get_transient(self::FAILURE_CACHE) !== false) return $this->stale_overview();
         if (!wp_next_scheduled(self::OVERVIEW_HOOK)) {
-            wp_schedule_single_event(time(), self::OVERVIEW_HOOK);
+            if (!wp_schedule_single_event(time(), self::OVERVIEW_HOOK) && class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'overview', 'error', 'schedule');
             if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
         }
         return $this->stale_overview();
@@ -53,7 +53,10 @@ class ArcWind_Init_OneUptime_Dashboard {
         $options = $this->options();
         if (!$options['enabled'] || !$options['status_page_id'] || !$options['status_url']) return;
         $url = wp_parse_url($options['status_url']);
-        if (!is_array($url) || ($url['scheme'] ?? '') !== 'https' || empty($url['host'])) return new WP_Error('invalid_url', 'Ogiltig HTTPS-adress.');
+        if (!is_array($url) || ($url['scheme'] ?? '') !== 'https' || empty($url['host'])) {
+            if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'overview', 'warning', 'configuration');
+            return new WP_Error('invalid_url', __('Ogiltig HTTPS-adress.', 'arcwind-init'));
+        }
         $host = 'https://' . $url['host'] . (!empty($url['port']) ? ':' . (int) $url['port'] : '');
         $endpoint = $host . '/status-page-api/overview/' . rawurlencode($options['status_page_id']);
         $data = ArcWind_Init_OneUptime::request_api($endpoint, 'overview', 'GET', 5);
@@ -84,6 +87,7 @@ class ArcWind_Init_OneUptime_Dashboard {
         $last_good = get_transient(self::LAST_GOOD);
         if (is_array($last_good) && isset($last_good['data'], $last_good['fetched_at']) && is_array($last_good['data']) && is_int($last_good['fetched_at'])) {
             $last_good['stale'] = true;
+            if (get_transient(self::FAILURE_CACHE) !== false && class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'overview', 'warning', 'stale');
             return $last_good;
         }
         return new WP_Error('api_unavailable', __('OneUptime är tillfälligt otillgängligt.', 'arcwind-init'));
@@ -93,11 +97,12 @@ class ArcWind_Init_OneUptime_Dashboard {
         $cached = get_transient(self::HISTORY_CACHE);
         if (is_array($cached) && isset($cached['windows']) && is_array($cached['windows'])) return $cached;
         if (get_transient(self::HISTORY_FAILURE) === false && !wp_next_scheduled(self::HISTORY_HOOK)) {
-            wp_schedule_single_event(time() + 5, self::HISTORY_HOOK);
+            if (!wp_schedule_single_event(time() + 5, self::HISTORY_HOOK) && class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'uptime-7d', 'error', 'schedule');
         }
         $last_good = get_transient(self::HISTORY_LAST_GOOD);
         if (is_array($last_good) && isset($last_good['windows']) && is_array($last_good['windows'])) {
             $last_good['stale'] = true;
+            if (get_transient(self::HISTORY_FAILURE) !== false && class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::record('OneUptime', 'uptime-7d', 'warning', 'stale');
             return $last_good;
         }
         return null;
@@ -121,6 +126,7 @@ class ArcWind_Init_OneUptime_Dashboard {
         $result = ['windows' => ['7d' => $payload], 'fetched_at' => $now, 'stale' => false];
         set_transient(self::HISTORY_CACHE, $result, 10 * MINUTE_IN_SECONDS);
         set_transient(self::HISTORY_LAST_GOOD, $result, DAY_IN_SECONDS);
+        if (class_exists('ArcWind_Init_Error_Log')) ArcWind_Init_Error_Log::recover('OneUptime', 'uptime-7d');
     }
 
     private function label($value, $fallback = null) {
@@ -313,13 +319,16 @@ class ArcWind_Init_OneUptime_Dashboard {
         }
         $result = $this->overview($o);
         if (is_wp_error($result)) {
-            echo '<p role="alert">' . esc_html__('Statusdata är tillfälligt otillgängliga.', 'arcwind-init') . '</p>';
+            $failed = get_transient(self::FAILURE_CACHE) !== false;
+            echo '<p role="status">' . esc_html($failed ? __('Statusdata är tillfälligt otillgängliga.', 'arcwind-init') : __('Statusdata väntar på första hämtningen.', 'arcwind-init')) . '</p>';
+            if ($failed && current_user_can('manage_options')) echo '<p><a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=diagnostics#arcwind-error-log')) . '">' . esc_html__('Visa diagnostik och fellogg', 'arcwind-init') . '</a></p>';
             return;
         }
         $data = $result['data'];
         $stale = !empty($result['stale']);
         $this->history_data = $this->history($o);
         if ($stale) echo '<p role="status">' . esc_html__('Statussidan kan inte nås. Senast kända data från', 'arcwind-init') . ' ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' ' . esc_html__('visas nedan; statusen är inte aktuell.', 'arcwind-init') . '</p>';
+        if ($stale && current_user_can('manage_options')) echo '<p><a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=diagnostics#arcwind-error-log')) . '">' . esc_html__('Visa diagnostik och fellogg', 'arcwind-init') . '</a></p>';
         if ($this->history_data === null) echo '<p>' . esc_html__('Historisk drifttid hämtas i bakgrunden.', 'arcwind-init') . '</p>';
         elseif (!empty($this->history_data['stale'])) echo '<p>' . esc_html__('Historisk drifttid är från en tidigare hämtning.', 'arcwind-init') . '</p>';
         echo '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px"><strong>' . esc_html($stale ? __('Senast kända status', 'arcwind-init') : __('Aktuell status', 'arcwind-init')) . '</strong>';

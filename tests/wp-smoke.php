@@ -138,6 +138,8 @@ try {
     update_option(ArcWind_Init_OneUptime::KEY, $oneuptime_failure_options, false);
     $failures = [
         new WP_Error('offline', 'secret-response-text'),
+        new WP_Error('http_request_failed', 'cURL error 28: secret-response-text'),
+        ['headers' => [], 'body' => 'unauthorized', 'response' => ['code' => 401, 'message' => 'Unauthorized']],
         ['headers' => [], 'body' => 'rate limited', 'response' => ['code' => 429, 'message' => 'Too Many Requests']],
         ['headers' => [], 'body' => '{bad json', 'response' => ['code' => 200, 'message' => 'OK']],
         ['headers' => [], 'body' => ['unexpected' => 'array'], 'response' => ['code' => 200, 'message' => 'OK']],
@@ -168,6 +170,42 @@ try {
         $plugin->refresh_posthog_stats();
         remove_filter('pre_http_request', $failure_mock, 10);
     }
+    $logged = ArcWind_Init_Error_Log::entries();
+    arcwind_smoke_check($logged !== [], 'Integration failures did not reach the central log');
+    arcwind_smoke_check(strpos(serialize($logged), 'secret-response-text') === false && strpos(serialize($logged), 'private-test-key') === false, 'Diagnostic log retained a secret');
+    $logged_codes = array_column($logged, 'code');
+    foreach (['timeout', 'authentication', 'http', 'format'] as $code) arcwind_smoke_check(in_array($code, $logged_codes, true), 'Diagnostic log missed failure category: ' . $code);
+    ob_start();
+    (new ArcWind_Init_Diagnostics())->render();
+    $diagnostics_html = ob_get_clean();
+    arcwind_smoke_check(strpos($diagnostics_html, 'id="arcwind-error-log"') !== false && strpos($diagnostics_html, '<details>') !== false &&
+        strpos($diagnostics_html, 'secret-response-text') === false, 'Administrator log view was missing or exposed a secret');
+    $admin_id = get_current_user_id();
+    $subscriber_id = wp_create_user('arcwind_smoke_' . strtolower(wp_generate_password(8, false, false)), wp_generate_password(24), 'arcwind-smoke-' . wp_generate_password(8, false, false) . '@example.test');
+    arcwind_smoke_check(!is_wp_error($subscriber_id), 'Could not create subscriber for capability test');
+    wp_set_current_user($subscriber_id);
+    arcwind_smoke_check(!current_user_can('manage_options') && ArcWind_Init_Error_Log::entries() === [] && ArcWind_Init_Error_Log::clear() === false, 'Subscriber accessed diagnostic log');
+    ob_start();
+    $_GET['tab'] = 'diagnostics';
+    $plugin->render_settings_page();
+    (new ArcWind_Init_Diagnostics())->render();
+    $unauthorized_html = ob_get_clean();
+    arcwind_smoke_check($unauthorized_html === '' && (new ArcWind_Init_Diagnostics())->test_connections() === [], 'Subscriber accessed settings or diagnostics');
+    $deny_handler = static function () { return static function () { throw new RuntimeException('Access denied by capability check'); }; };
+    add_filter('wp_die_handler', $deny_handler);
+    $denied = false;
+    try {
+        (new ArcWind_Init_Diagnostics())->handle_action();
+    } catch (RuntimeException $error) {
+        $denied = $error->getMessage() === 'Access denied by capability check';
+    }
+    remove_filter('wp_die_handler', $deny_handler);
+    arcwind_smoke_check($denied, 'Subscriber reached a privileged diagnostics action');
+    arcwind_smoke_check(apply_filters('option_page_capability_arcwind_init_settings_group', 'read') === 'manage_options' &&
+        apply_filters('option_page_capability_arcwind_init_oneuptime_group', 'read') === 'manage_options', 'Direct options.php writes were not restricted');
+    wp_set_current_user($admin_id);
+    require_once ABSPATH . 'wp-admin/includes/user.php';
+    wp_delete_user($subscriber_id);
     echo "WordPress activation and failure smoke tests passed.\n";
 } finally {
     update_option(ArcWind_Init::OPTION_KEY, $old_settings, false);

@@ -15,7 +15,7 @@ restore_file() {
 }
 trap restore_file EXIT
 
-for module in class-arcwind-init-oneuptime.php class-arcwind-init-oneuptime-dashboard.php class-arcwind-init-feedback-trait.php class-arcwind-init-settings-trait.php class-arcwind-init-github-updater.php; do
+for module in class-arcwind-init-error-log.php class-arcwind-init-oneuptime.php class-arcwind-init-oneuptime-dashboard.php class-arcwind-init-feedback-trait.php class-arcwind-init-settings-trait.php class-arcwind-init-github-updater.php; do
   disabled_file="$plugin_root/includes/$module"
   mv "$disabled_file" "$disabled_file.disabled"
   php "$wp_cli" eval 'if (!class_exists("ArcWind_Init")) { throw new RuntimeException("Plugin bootstrap failed"); }' --path="$wp_root" "${wp_args[@]}"

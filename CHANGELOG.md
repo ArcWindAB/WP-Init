@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.1.0
+
+- Add a bounded administrator-only diagnostic error log with safe error categories, suggested actions, filters, deduplication, recovery entries, and confirmed clearing.
+- Link failed or stale dashboard states to diagnostics for administrators and distinguish the first pending retrieval from a failed fetch.
+- Verify direct settings and diagnostic capabilities, add error-log regression coverage, and restrict CI workflow token permissions to read-only repository contents.
+
 ## 2.0.1
 
 - Align PostHog settings with the regional API host fallback: a project token unlocks web and error tracking when the custom API host is empty.

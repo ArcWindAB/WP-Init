@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: PostHog-spårning och dashboardstatistik, feedbacklänk samt OneUptime-status, driftinformation, alerts och heartbeat.
- * Version:     2.0.1
+ * Version:     2.1.0
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init
@@ -26,6 +26,7 @@ function arcwind_init_load_module($filename) {
     }
 }
 
+arcwind_init_load_module('class-arcwind-init-error-log.php');
 arcwind_init_load_module('class-arcwind-init-tracker.php');
 arcwind_init_load_module('class-arcwind-init-oneuptime.php');
 arcwind_init_load_module('class-arcwind-init-oneuptime-dashboard.php');
@@ -40,6 +41,10 @@ if (!trait_exists('ArcWind_Init_Dashboard_Trait')) { trait ArcWind_Init_Dashboar
 if (!trait_exists('ArcWind_Init_Feedback_Trait')) { trait ArcWind_Init_Feedback_Trait {} }
 if (!trait_exists('ArcWind_Init_PostHog_Trait')) { trait ArcWind_Init_PostHog_Trait {} }
 define('ARCWIND_INIT_SETTINGS_LOADED', $arcwind_settings_loaded);
+
+// WordPress options.php checks these capabilities on direct settings submissions.
+add_filter('option_page_capability_arcwind_init_settings_group', static function () { return 'manage_options'; }, PHP_INT_MAX);
+add_filter('option_page_capability_arcwind_init_oneuptime_group', static function () { return 'manage_options'; }, PHP_INT_MAX);
 
 if (class_exists('ArcWind_Init_OneUptime')) {
     register_activation_hook(__FILE__, ['ArcWind_Init_OneUptime', 'activate']);
