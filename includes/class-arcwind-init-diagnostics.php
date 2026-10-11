@@ -14,7 +14,7 @@ class ArcWind_Init_Diagnostics {
         check_admin_referer('arcwind_init_diagnostics');
         $task = isset($_POST['diagnostic_task']) && is_string($_POST['diagnostic_task']) ? sanitize_key(wp_unslash($_POST['diagnostic_task'])) : '';
         if ($task === 'clear') {
-            foreach (['arcwind_init_stats_v1', ArcWind_Init_OneUptime::CACHE,
+            foreach (['arcwind_init_stats_v1', ArcWind_Init_OneUptime::CACHE, ArcWind_Init_OneUptime::ALERT_CACHE,
                 ArcWind_Init_OneUptime_Dashboard::CACHE, ArcWind_Init_OneUptime_Dashboard::LAST_GOOD,
                 ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE, ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE,
                 ArcWind_Init_OneUptime_Dashboard::HISTORY_LAST_GOOD, ArcWind_Init_OneUptime_Dashboard::HISTORY_FAILURE,
@@ -61,7 +61,7 @@ class ArcWind_Init_Diagnostics {
         $uuid = $settings['feedback_uuid'] ?? '';
         $result[] = is_string($uuid) && preg_match('/^[A-Za-z0-9]+$/', $uuid) ? 'Feedback: giltig UUID-konfiguration.' : 'Feedback: UUID saknas eller är ogiltig.';
 
-        $oneuptime = (array) get_option(ArcWind_Init_OneUptime::KEY, []);
+        $oneuptime = ArcWind_Init_OneUptime::options();
         $status_url = ArcWind_Init_OneUptime::api_text($oneuptime['status_url'] ?? '');
         $page_id = ArcWind_Init_OneUptime::api_text($oneuptime['status_page_id'] ?? '');
         $parts = $status_url ? wp_parse_url($status_url) : false;
@@ -77,14 +77,15 @@ class ArcWind_Init_Diagnostics {
 
     public function render() {
         $settings = (array) get_option(ArcWind_Init::OPTION_KEY, []);
-        $oneuptime = (array) get_option(ArcWind_Init_OneUptime::KEY, []);
+        $oneuptime = ArcWind_Init_OneUptime::options();
         $health = get_option(ArcWind_Init_OneUptime::HEARTBEAT_HEALTH, []);
         $health = is_array($health) ? $health : [];
         echo '<h2>Diagnostik</h2><ul>';
         echo '<li>PostHog: ' . (!empty($settings['enable_tracking']) ? 'spårning aktiv' : 'spårning av') . '; ' . (!empty($settings['personal_api_key']) ? 'servernyckel sparad' : 'servernyckel saknas') . '.</li>';
         echo '<li>Feedback: ' . (!empty($settings['feedback_enabled']) ? 'aktiv' : 'av') . '; ' . (!empty($settings['feedback_uuid']) ? 'UUID sparad' : 'UUID saknas') . '.</li>';
         echo '<li>OneUptime: ' . (!empty($oneuptime['enabled']) ? 'aktiv' : 'av') . '; ' . (!empty($oneuptime['status_url']) && !empty($oneuptime['status_page_id']) ? 'statussida konfigurerad' : 'statussida saknas') . '.</li>';
-        echo '<li>Heartbeat: ' . (!empty($oneuptime['heartbeat_enabled']) ? 'aktiv' : 'av') . '; ' . (!empty($oneuptime['heartbeat_url']) ? 'hemlighet sparad' : 'hemlighet saknas') . '.</li>';
+        echo '<li>Heartbeat: ' . (!empty($oneuptime['heartbeat_enabled']) ? 'aktiv' : 'av') . '; ' . (!empty($oneuptime['heartbeat_url']) ? 'ID sparat' : 'ID saknas') . '.</li>';
+        echo '<li>OneUptime-alerts: ' . (!empty($oneuptime['alerts_admin']) ? 'visning i admin aktiv' : 'visning i admin av') . '; ' . (!empty($oneuptime['alerts_api_key']) ? 'API-nyckel sparad' : 'API-nyckel saknas') . '.</li>';
         echo '<li>PHP: ' . esc_html(PHP_VERSION) . '; plugin: ' . esc_html(ArcWind_Init::get_version()) . '.</li>';
         $next = wp_next_scheduled(ArcWind_Init_OneUptime::HOOK);
         if ($next) {

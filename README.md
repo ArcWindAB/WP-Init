@@ -60,25 +60,28 @@ Widgeten visas först när feedback är aktiverad och ett giltigt UUID finns. De
 
 | Fält | Standard | Funktion |
 | --- | --- | --- |
-| Aktivera OneUptime | av | Aktiverar statusintegration och dashboard-widget. |
-| Publik statussida (URL) | tomt | HTTPS-adress, exempelvis `https://status.example.com`. |
-| Status Page ID (eller domän) | tomt | ID eller verifierad domän för publika status-API:et. Uptime-API:et kräver ID. |
-| Visa informationsbanner | på | Huvudbrytare för banner och adminmeddelanden. |
-| Visa banner på webbplatsen | på | Visar statusmeddelanden i frontend. |
-| Visa meddelanden i admin | på | Visar statusmeddelanden som WordPress-notiser. |
-| Visa incidenter | på | Visar öppna incidenter. |
-| Visa meddelanden | på | Visar aktuella announcements. |
-| Visa planerade underhåll | på | Visar planerat/pågående underhåll. |
-| Aktivera heartbeat | av | Schemalägger heartbeat när giltig adress finns. |
-| Heartbeat-URL | tomt | Hemlig publik HTTPS-adress av formen `https://monitor.example.com/heartbeat/SECRET`. Lämna fältet tomt för att behålla sparad adress, eller använd kryssrutan för att radera den. |
+| OneUptime-värd | tomt | HTTPS-basadress, exempelvis `https://oneuptime.example.com/`. |
+| Statussidans ID | tomt | ID för den publika statussidan. Statussidans adress byggs som `<värd>/status-page/<ID>`. |
+| Driftinformation på webbplatsen | på | Visar valda händelser i en banner. Kräver värd och status-ID. |
+| Incidenter, meddelanden, underhåll på webbplatsen | på | Tre separata val för webbplatsen. |
+| Driftinformation i admin | på | Visar valda händelser som WordPress-notiser. Kräver värd och status-ID. |
+| Incidenter, meddelanden, underhåll i admin | på | Tre separata val för admin. |
+| Skicka heartbeat | av | Schemalägger heartbeat när värd och heartbeat-ID finns. |
+| Heartbeat-ID | tomt | ID från en Incoming Request-monitor. En fullständig URL av formen `<värd>/heartbeat/<ID>` kan klistras in och kortas till ID:t i fältet. |
+| API-nyckel för alerts | tomt | Nyckel med läsbehörighet för Alert och Alert State. Efter sparning visas en knapp som sparar formuläret och tar bort nyckeln. Inmatningsfältet visas igen när nyckeln har tagits bort. |
+| Visa alerts i admin | av | Visar högst tio olösta alerts från statussidans monitorer i en adminnotis för administratörer. Klicka på en titel för att läsa beskrivningen. |
+
+Statussida, Driftinformation, Heartbeat och Alerts finns som öppningsbara avsnitt i samma inställningstabell. Heartbeat är låst tills OneUptime-värden har fyllts i. Driftinformation och Alerts är låsta tills både värd och status-ID har fyllts i. Äldre sparade URL:er och visningsval läses in automatiskt.
 
 OneUptime-data hämtas från statussidans publika API. Bannern visar högst tio meddelanden och filtrerar framtida announcements, avslutade incidenter och avslutat underhåll. Dismiss-knappar använder webbläsarens session storage per användare; nya incident-ID:n påverkas inte av tidigare dismiss. Incidenter utan ID kan inte avfärdas. WordPress admin-bar flyttas efter bannerns uppmätta höjd när den visas.
+
+Alerts hämtas separat från OneUptimes autentiserade API med den sparade nyckeln. Pluginet läser monitorerna direkt från den konfigurerade statussidan, inklusive monitorer i sidans monitorgrupper, och visar bara deras olösta alerts. Om monitorerna inte kan läsas visas inga alerts. Resultatet cachas i en minut. Alerts visas aldrig i den publika bannern.
 
 Dashboard-widgeten får statussidans eget namn som rubrik. Övergripande status syns direkt; komponenter och nästlade grupper öppnas vid behov, medan tjänsterna visas som enkla rader. Aktuell status hämtas högst en gång per minut. Drifttid för **de senaste 7 dagarna** hämtas i ett separat WP-Cron-jobb och kan saknas på första sidladdningen. Utebliven drifttid märks **uppgift saknas**. När API:et fallerar backar kontrollen i 60 sekunder; senast kända data kan visas i upp till ett dygn och märks **ej aktuell** med grå statusindikator och tidsstämpel. Den visas aldrig som ny grön status. API-svar utan förväntade fält ignoreras och loggas utan innehåll eller hemliga URL:er.
 
 ### Heartbeat och WP-Cron
 
-Skapa en Incoming Request-monitor i OneUptime och kopiera dess hemliga heartbeat-adress. Anropet använder `wp_safe_remote_get()`, HTTPS, inga omdirigeringar och fem sekunders timeout. WordPress validerar publika adresser även efter DNS-upplösning. HTTP-kod utanför 2xx registreras som fel; senaste försök och framgång syns under Diagnostik utan token.
+Skapa en Incoming Request-monitor i OneUptime och kopiera dess heartbeat-ID eller hela adress. Anropet använder `wp_safe_remote_get()`, HTTPS, inga omdirigeringar och fem sekunders timeout. WordPress validerar publika adresser även efter DNS-upplösning. HTTP-kod utanför 2xx registreras som fel; senaste försök och framgång syns under Diagnostik.
 
 Pluginet har högst ett återkommande heartbeat-event när integrationen, heartbeat och en giltig adress är aktiverade. Eventet tas bort när pluginet inaktiveras eller avinstalleras. WP-Cron körs normalt först när webbplatsen får trafik. För mer pålitliga kontroller, låt systemcron anropa `wp-cron.php` ungefär varje minut och sätt OneUptimes larmgräns med marginal, till exempel tre missade minuter. Exempel (byt domän):
 
@@ -114,7 +117,7 @@ Publicera sedan ZIP-filen som `arcwind-init.zip` på en GitHub Release vars tagg
 | PostHog-statistik saknas | Ange HTTPS-värd, Project ID och Personal API Key. Kör anslutningstest under Diagnostik. |
 | JavaScript-events saknas | Aktivera spårning, ange publik API-nyckel och kontrollera webbläsarens nätverkslogg. Samtyckesblockering kan stoppa skriptet. |
 | Feedback-knapp saknas | Aktivera feedback och spara ett alfanumeriskt UUID. |
-| OneUptime-widget saknas | Aktivera integrationen och ange publik status-URL och ID. Kontrollera att statussidan är publik. |
+| OneUptime-widget saknas | Ange OneUptime-värd och statussidans ID. Kontrollera att statussidan är publik. |
 | Status visas som äldre data | Kontrollera status-API och serverns utgående HTTPS. Rensa cache under Diagnostik när anslutningen fungerar igen. |
 | Drifttidshistorik saknas | Kontrollera att ID används i stället för domänalias och att WP-Cron körs. |
 | Heartbeat uteblir | Kontrollera giltig publik HTTPS-adress, senaste försök och cron-schema i Diagnostik; använd systemcron vid låg trafik. |

@@ -189,6 +189,7 @@ trait ArcWind_Init_Settings_Trait {
             echo '<a class="nav-tab ' . ($tab === $key ? 'nav-tab-active' : '') . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
         }
         echo '</nav>';
+        ArcWind_Init_OneUptime::render_alert_notice();
         if ($tab === 'diagnostics') {
             $this->diagnostics->render();
             echo '</div>';
@@ -197,7 +198,7 @@ trait ArcWind_Init_Settings_Trait {
         echo '<form method="post" action="options.php">';
         if ($tab === 'oneuptime') {
             settings_fields('arcwind_init_oneuptime_group');
-            do_settings_sections('arcwind_init_oneuptime');
+            ArcWind_Init_OneUptime::render_settings_table();
         } else {
             settings_fields('arcwind_init_settings_group');
             echo '<input type="hidden" name="arcwind_init_active_tab" value="' . esc_attr($tab) . '">';

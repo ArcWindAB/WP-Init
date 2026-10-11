@@ -20,18 +20,12 @@ class ArcWind_Init_OneUptime_Dashboard {
     }
 
     private function options() {
-        $options = wp_parse_args((array) get_option(ArcWind_Init_OneUptime::KEY, []), [
-            'enabled' => 0, 'status_url' => '', 'status_page_id' => '',
-        ]);
-        foreach (['status_url', 'status_page_id'] as $key) {
-            $options[$key] = ArcWind_Init_OneUptime::api_text($options[$key]);
-        }
-        return $options;
+        return ArcWind_Init_OneUptime::options();
     }
 
     public function register_widget() {
         $o = $this->options();
-        if (!$o['enabled']) return;
+        if (!$o['enabled'] || !$o['status_page_id'] || !$o['status_url']) return;
         $title = 'Driftstatus';
         if ($o['status_url'] && $o['status_page_id']) {
             $result = $this->overview($o);

@@ -7,6 +7,7 @@ if (!defined('ABSPATH')) exit;
 class ArcWind_Init_OneUptime {
     const KEY = 'arcwind_init_oneuptime';
     const CACHE = 'arcwind_init_oneuptime_incident';
+    const ALERT_CACHE = 'arcwind_init_oneuptime_alerts';
     const HOOK = 'arcwind_init_oneuptime_heartbeat';
     const HEARTBEAT_HEALTH = 'arcwind_init_oneuptime_heartbeat_health';
 
@@ -20,88 +21,186 @@ class ArcWind_Init_OneUptime {
         add_action('wp_head', [$this, 'banner_styles']);
     }
 
-    public function options() {
-        $options = wp_parse_args((array) get_option(self::KEY, []), [
-            'enabled' => 0, 'status_url' => '', 'status_page_id' => '',
-            'heartbeat_enabled' => 0, 'heartbeat_url' => '',
-            'banner_enabled' => 1, 'show_incidents' => 1,
-            'banner_public' => 1, 'banner_admin' => 1,
-            'show_announcements' => 1, 'show_maintenance' => 1,
+    public static function options() {
+        $saved = (array) get_option(self::KEY, []);
+        $options = wp_parse_args($saved, [
+            'enabled' => 0, 'host' => '', 'status_url' => '', 'status_page_id' => '',
+            'heartbeat_enabled' => 0, 'heartbeat_secret' => '', 'heartbeat_url' => '',
+            'alerts_api_key' => '', 'alerts_admin' => 0,
+            'banner_enabled' => 1, 'banner_public' => 1, 'banner_admin' => 1,
+            'show_incidents' => 1, 'show_announcements' => 1, 'show_maintenance' => 1,
         ]);
-        foreach (['status_url', 'status_page_id', 'heartbeat_url'] as $key) {
+        foreach (['host', 'status_url', 'status_page_id', 'heartbeat_secret', 'heartbeat_url', 'alerts_api_key'] as $key) {
             $options[$key] = self::api_text($options[$key]);
         }
+        if (!$options['host'] && $options['status_url']) $options['host'] = self::host_from_url($options['status_url']);
+        if (!$options['heartbeat_secret'] && $options['heartbeat_url']) {
+            $options['heartbeat_secret'] = self::secret_from_url($options['heartbeat_url']);
+        }
+        if ($options['host'] && $options['status_page_id']) {
+            $options['status_url'] = $options['host'] . '/status-page/' . rawurlencode($options['status_page_id']);
+        }
+        if ($options['host'] && $options['heartbeat_secret'] && (array_key_exists('host', $saved) || !$options['heartbeat_url'])) {
+            $options['heartbeat_url'] = $options['host'] . '/heartbeat/' . rawurlencode($options['heartbeat_secret']);
+        }
+        foreach (['public', 'admin'] as $place) {
+            foreach (['incidents', 'announcements', 'maintenance'] as $type) {
+                $key = $place . '_' . $type;
+                $options[$key] = array_key_exists($key, $saved) ? (int) !empty($saved[$key]) : (int) !empty($options['show_' . $type]);
+            }
+        }
+        if (empty($options['banner_enabled'])) $options['banner_public'] = $options['banner_admin'] = 0;
         return $options;
+    }
+
+    private static function host_from_url($url) {
+        $parts = wp_parse_url($url);
+        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) ||
+            isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) return '';
+        $path = rtrim($parts['path'] ?? '', '/');
+        if ($path !== '' && !preg_match('~^/(?:status-page|heartbeat)/[^/]+$~', $path)) return '';
+        return 'https://' . $parts['host'] . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+    }
+
+    private static function secret_from_url($url) {
+        $parts = wp_parse_url($url);
+        $path = is_array($parts) ? rtrim($parts['path'] ?? '', '/') : '';
+        return preg_match('~^/heartbeat/([A-Za-z0-9._-]+)$~', $path, $matches) ? $matches[1] : '';
     }
 
     public function register_settings() {
         register_setting('arcwind_init_oneuptime_group', self::KEY, [
             'type' => 'array', 'sanitize_callback' => [$this, 'sanitize'],
         ]);
-        add_settings_section('arcwind_init_oneuptime_section', 'OneUptime',
-            function () {
-                echo '<p>Visa öppna incidenter från en publik OneUptime-statussida och övervaka WordPress med heartbeat.</p>';
-                echo '<p><strong>Obs:</strong> WP-Cron körs när webbplatsen får trafik. För ett tillförlitligt minutintervall krävs en extern cron som anropar wp-cron.php varje minut.</p>';
-            }, 'arcwind_init_oneuptime');
-        foreach ([
-            'enabled' => ['Aktivera OneUptime', 'checkbox'],
-            'status_url' => ['Publik statussida (URL)', 'url'],
-            'status_page_id' => ['Status Page ID (eller domän)', 'text'],
-            'banner_enabled' => ['Visa informationsbanner', 'checkbox'],
-            'banner_public' => ['Visa banner på webbplatsen', 'checkbox'],
-            'banner_admin' => ['Visa meddelanden i admin', 'checkbox'],
-            'show_incidents' => ['Visa incidenter', 'checkbox'],
-            'show_announcements' => ['Visa meddelanden (Announcements)', 'checkbox'],
-            'show_maintenance' => ['Visa planerade underhåll', 'checkbox'],
-            'heartbeat_enabled' => ['Aktivera heartbeat', 'checkbox'],
-            'heartbeat_url' => ['Heartbeat-URL (hemlig)', 'password'],
-        ] as $key => $definition) {
-            add_settings_field('arcwind_oneuptime_' . $key, $definition[0],
-                function () use ($key, $definition) {
-                    $settings = $this->options();
-                    $name = self::KEY . '[' . $key . ']';
-                    if ($definition[1] === 'checkbox') {
-                        echo '<input type="hidden" name="' . esc_attr($name) . '" value="0">';
-                        echo '<input type="checkbox" name="' . esc_attr($name) . '" value="1" ' . checked(!empty($settings[$key]), true, false) . '>';
+        add_settings_section('arcwind_oneuptime_connection', 'Statussida', function () {
+            echo '<p>Ange OneUptime-värden och statussidans ID. Statussidans adress skapas automatiskt.</p>';
+        }, 'arcwind_init_oneuptime');
+        add_settings_section('arcwind_oneuptime_information', 'Driftinformation', function () {
+            echo '<p>Välj vilka aktuella händelser som ska visas på webbplatsen och i WordPress-admin.</p>';
+        }, 'arcwind_init_oneuptime');
+        add_settings_section('arcwind_oneuptime_heartbeat', 'Heartbeat', function () {
+            echo '<p>Heartbeat är en återkommande signal från webbplatsen till OneUptime. Skapa först en <strong>Incoming Request-monitor</strong> i OneUptime och ange dess heartbeat-ID nedan.</p>';
+            echo '<p>Signalen skickas med WP-Cron ungefär varje minut när webbplatsen får trafik. Använd extern cron för ett tillförlitligt minutintervall.</p>';
+        }, 'arcwind_init_oneuptime');
+        add_settings_section('arcwind_oneuptime_alerts', 'Alerts', function () {
+            echo '<p>Visa olösta alerts för monitorerna på statussidan i WordPress-admin.</p>';
+        }, 'arcwind_init_oneuptime');
+        $fields = [
+            'host' => ['OneUptime-värd', 'url', 'arcwind_oneuptime_connection'],
+            'status_page_id' => ['Statussidans ID', 'text', 'arcwind_oneuptime_connection'],
+            'banner_public' => ['Visa driftinformation på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
+            'public_incidents' => ['Visa incidenter på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
+            'public_announcements' => ['Visa meddelanden på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
+            'public_maintenance' => ['Visa planerade underhåll på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
+            'banner_admin' => ['Visa driftinformation i admin', 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_incidents' => ['Visa incidenter i admin', 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_announcements' => ['Visa meddelanden i admin', 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_maintenance' => ['Visa planerade underhåll i admin', 'checkbox', 'arcwind_oneuptime_information'],
+            'heartbeat_enabled' => ['Skicka heartbeat', 'checkbox', 'arcwind_oneuptime_heartbeat'],
+            'heartbeat_secret' => ['Heartbeat-ID', 'text', 'arcwind_oneuptime_heartbeat'],
+            'alerts_api_key' => ['API-nyckel för alerts', 'password', 'arcwind_oneuptime_alerts'],
+            'alerts_admin' => ['Visa alerts i admin', 'checkbox', 'arcwind_oneuptime_alerts'],
+        ];
+        foreach ($fields as $key => $definition) {
+            add_settings_field('arcwind_oneuptime_' . $key, $definition[0], function () use ($key, $definition) {
+                $settings = $this->options();
+                $name = self::KEY . '[' . $key . ']';
+                if ($definition[1] === 'checkbox') {
+                    echo '<input type="hidden" name="' . esc_attr($name) . '" value="0">';
+                    echo '<input type="checkbox" name="' . esc_attr($name) . '" value="1" ' . checked(!empty($settings[$key]), true, false) . '>';
+                    return;
+                }
+                if ($key === 'alerts_api_key') {
+                    if ($settings['alerts_api_key'] !== '') {
+                        echo '<p class="description">En API-nyckel är sparad.</p>';
+                        echo '<button type="submit" class="button" name="' . esc_attr(self::KEY) . '[alerts_api_key_clear]" value="1">Ta bort API-nyckel och spara ändringar</button>';
                     } else {
-                        $value = $key === 'heartbeat_url' ? '' : $settings[$key];
-                        echo '<input class="regular-text" type="' . esc_attr($definition[1]) . '" name="' . esc_attr($name) . '" value="' . esc_attr($value) . '" autocomplete="off">';
-                        if ($key === 'heartbeat_url' && $settings[$key] !== '') {
-                            echo '<p class="description">En heartbeat-adress är sparad. Lämna fältet tomt för att behålla den.</p>';
-                            echo '<label><input type="checkbox" name="' . esc_attr(self::KEY) . '[heartbeat_clear]" value="1"> Radera sparad heartbeat-adress</label>';
-                        }
+                        echo '<input id="arcwind_oneuptime_alerts_api_key" class="regular-text" type="password" name="' . esc_attr($name) . '" value="" autocomplete="new-password">';
+                        echo '<p class="description">Nyckeln behöver läsbehörighet för Alert och Alert State.</p>';
                     }
-                }, 'arcwind_init_oneuptime', 'arcwind_init_oneuptime_section');
+                    return;
+                }
+                $id = 'arcwind_oneuptime_' . $key;
+                echo '<input id="' . esc_attr($id) . '" class="regular-text" type="' . esc_attr($definition[1]) . '" name="' . esc_attr($name) . '" value="' . esc_attr($settings[$key]) . '" autocomplete="off"' . ($key === 'host' ? ' placeholder="https://oneuptime.app.arc.vin/"' : '') . '>';
+                if ($key === 'host') echo '<p class="description">Basadressen till din OneUptime-installation, med https://.</p>';
+                if ($key === 'status_page_id' && $settings['status_url']) echo '<p class="description">Statussida: <a href="' . esc_url($settings['status_url']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($settings['status_url']) . '</a></p>';
+                if ($key === 'heartbeat_secret') {
+                    echo '<p class="description">Du kan klistra in hela heartbeat-adressen; adressen kortas automatiskt till ID:t i fältet.</p>';
+                    if ($settings['heartbeat_url']) echo '<p class="description">Heartbeat-adress: <code>' . esc_html($settings['heartbeat_url']) . '</code></p>';
+                    echo '<script>(function(){var input=document.getElementById("arcwind_oneuptime_heartbeat_secret"),host=document.getElementById("arcwind_oneuptime_host");function normalize(){var v=input.value.trim(),h=host.value.trim().replace(/\/+$/,"");if(h&&v.indexOf(h+"/heartbeat/")===0)input.value=v.slice((h+"/heartbeat/").length).replace(/\/+$/,"")}input.addEventListener("input",normalize);host.addEventListener("input",normalize)})();</script>';
+                }
+            }, 'arcwind_init_oneuptime', $definition[2]);
         }
+    }
+
+    public static function render_settings_table() {
+        $settings = self::options();
+        $host_ready = $settings['host'] !== '';
+        $status_ready = $settings['host'] !== '' && $settings['status_page_id'] !== '';
+        $groups = [
+            'arcwind_oneuptime_connection' => ['Statussida', 'Ange OneUptime-värd och statussidans ID. Adressen skapas automatiskt.'],
+            'arcwind_oneuptime_information' => ['Driftinformation', 'Välj vilka händelser som visas på webbplatsen och i WordPress-admin.'],
+            'arcwind_oneuptime_heartbeat' => ['Heartbeat', 'En heartbeat är en återkommande signal till OneUptime. Skapa en Incoming Request-monitor och ange dess heartbeat-ID. WP-Cron skickar signalen ungefär varje minut när webbplatsen får trafik.'],
+            'arcwind_oneuptime_alerts' => ['Alerts', 'Visa olösta alerts från monitorerna på statussidan i WordPress-admin. API-nyckeln behöver läsbehörighet för Alert och Alert State.'],
+        ];
+        echo '<style>#arcwind-oneuptime-settings tbody[hidden]{display:none}#arcwind-oneuptime-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-oneuptime-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-oneuptime-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}</style>';
+        echo '<table class="form-table" role="presentation" id="arcwind-oneuptime-settings">';
+        foreach ($groups as $section => $details) {
+            $open = $section === 'arcwind_oneuptime_connection';
+            $locked = ($section === 'arcwind_oneuptime_heartbeat' && !$host_ready) ||
+                (in_array($section, ['arcwind_oneuptime_information', 'arcwind_oneuptime_alerts'], true) && !$status_ready);
+            $target = $section . '_fields';
+            echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($section === 'arcwind_oneuptime_information' ? ' <span id="arcwind-oneuptime-status-required"' . ($status_ready ? ' hidden' : '') . '>Fyll i värd och statussidans ID för att låsa upp valen.</span>' : '') . ($section === 'arcwind_oneuptime_heartbeat' ? ' <span id="arcwind-oneuptime-host-required"' . ($host_ready ? ' hidden' : '') . '>Fyll i OneUptime-värd för att låsa upp heartbeat.</span>' : '') . '</p></th></tr></tbody>';
+            echo '<tbody id="' . esc_attr($target) . '"' . ($open ? '' : ' hidden') . '>';
+            do_settings_fields('arcwind_init_oneuptime', $section);
+            echo '</tbody>';
+        }
+        echo '</table>';
+        echo '<script>(function(){var table=document.getElementById("arcwind-oneuptime-settings");if(!table)return;var info=table.querySelector("button[aria-controls=arcwind_oneuptime_information_fields]"),body=document.getElementById("arcwind_oneuptime_information_fields"),alerts=table.querySelector("button[aria-controls=arcwind_oneuptime_alerts_fields]"),alertRows=document.getElementById("arcwind_oneuptime_alerts_fields"),heartbeat=table.querySelector("button[aria-controls=arcwind_oneuptime_heartbeat_fields]"),heartbeatRows=document.getElementById("arcwind_oneuptime_heartbeat_fields"),hint=document.getElementById("arcwind-oneuptime-status-required"),heartbeatHint=document.getElementById("arcwind-oneuptime-host-required"),host=document.getElementById("arcwind_oneuptime_host"),id=document.getElementById("arcwind_oneuptime_status_page_id");function lock(button,rows,ready){button.disabled=!ready;if(!ready){rows.hidden=true;button.setAttribute("aria-expanded","false");button.querySelector(".dashicons").className="dashicons dashicons-arrow-right-alt2"}}function gate(){var hostReady=!!host.value.trim(),statusReady=!!(hostReady&&id.value.trim());lock(info,body,statusReady);lock(alerts,alertRows,statusReady);lock(heartbeat,heartbeatRows,hostReady);hint.hidden=statusReady;heartbeatHint.hidden=hostReady}host.addEventListener("input",gate);id.addEventListener("input",gate);table.addEventListener("click",function(event){var button=event.target.closest("button[aria-controls]");if(!button||!table.contains(button)||button.disabled)return;var rows=document.getElementById(button.getAttribute("aria-controls"));if(!rows)return;rows.hidden=!rows.hidden;button.setAttribute("aria-expanded",rows.hidden?"false":"true");var icon=button.querySelector(".dashicons");if(icon)icon.className="dashicons dashicons-arrow-"+(rows.hidden?"right":"down")+"-alt2"})})();</script>';
     }
 
     public function sanitize($raw) {
         $raw = is_array($raw) ? $raw : [];
         $out = [];
-        foreach (['enabled', 'banner_enabled', 'banner_public', 'banner_admin', 'show_incidents', 'show_announcements', 'show_maintenance', 'heartbeat_enabled'] as $key) {
+        foreach (['banner_public', 'banner_admin', 'public_incidents', 'public_announcements', 'public_maintenance',
+            'admin_incidents', 'admin_announcements', 'admin_maintenance', 'heartbeat_enabled', 'alerts_admin'] as $key) {
             $out[$key] = empty($raw[$key]) ? 0 : 1;
+        }
+        $out['banner_enabled'] = (int) ($out['banner_public'] || $out['banner_admin']);
+        foreach (['incidents', 'announcements', 'maintenance'] as $type) $out['show_' . $type] = (int) ($out['public_' . $type] || $out['admin_' . $type]);
+        $out['host'] = rtrim(esc_url_raw(self::api_text($raw['host'] ?? '')), '/');
+        if ($out['host'] && self::host_from_url($out['host']) !== $out['host']) {
+            add_settings_error(self::KEY, 'host', 'Ange en giltig HTTPS-värd utan sökväg.', 'error');
+            $out['host'] = '';
         }
         $out['status_page_id'] = sanitize_text_field(self::api_text($raw['status_page_id'] ?? ''));
         $out['status_page_id'] = preg_replace('/[^A-Za-z0-9._-]/', '', $out['status_page_id']);
-        $out['status_url'] = esc_url_raw(self::api_text($raw['status_url'] ?? ''));
-        $existing = $this->options();
-        $new_heartbeat = self::api_text($raw['heartbeat_url'] ?? '');
-        $out['heartbeat_url'] = !empty($raw['heartbeat_clear']) ? '' : ($new_heartbeat === '' ? $existing['heartbeat_url'] : esc_url_raw($new_heartbeat));
-        foreach (['status_url', 'heartbeat_url'] as $key) {
-            if ($out[$key] && wp_parse_url($out[$key], PHP_URL_SCHEME) !== 'https') {
-                add_settings_error(self::KEY, $key, 'Endast HTTPS-adresser tillåts.', 'error');
-                $out[$key] = '';
-            }
+        $out['status_url'] = $out['host'] && $out['status_page_id'] ? $out['host'] . '/status-page/' . rawurlencode($out['status_page_id']) : '';
+        $secret = self::api_text($raw['heartbeat_secret'] ?? '');
+        if (strpos($secret, '://') !== false) {
+            $prefix = $out['host'] . '/heartbeat/';
+            if (!$out['host'] || strpos($secret, $prefix) !== 0) {
+                add_settings_error(self::KEY, 'heartbeat_secret', 'Heartbeat-adressen måste höra till den angivna värden.', 'error');
+                $secret = '';
+            } else $secret = substr($secret, strlen($prefix));
         }
-        if ($out['heartbeat_url'] && !preg_match('~/heartbeat/[^/]+/?$~', $out['heartbeat_url'])) {
-            add_settings_error(self::KEY, 'heartbeat_url', 'Heartbeat-adressen måste innehålla /heartbeat/SECRET.', 'error');
-            $out['heartbeat_url'] = '';
+        $secret = rtrim($secret, '/');
+        if ($secret !== '' && !preg_match('/^[A-Za-z0-9._-]+$/', $secret)) {
+            add_settings_error(self::KEY, 'heartbeat_secret', 'Ange ett giltigt heartbeat-ID.', 'error');
+            $secret = '';
         }
-        if ($out['heartbeat_url'] && !self::valid_heartbeat_url($out['heartbeat_url'])) {
-            add_settings_error(self::KEY, 'heartbeat_url', 'Heartbeat-adressen måste vara en publik HTTPS-adress.', 'error');
-            $out['heartbeat_url'] = $existing['heartbeat_url'];
+        $out['heartbeat_secret'] = $secret;
+        $out['heartbeat_url'] = $out['host'] && $secret ? $out['host'] . '/heartbeat/' . rawurlencode($secret) : '';
+        $out['enabled'] = (int) (bool) $out['host'];
+        $existing = self::options();
+        $new_key = self::api_text($raw['alerts_api_key'] ?? '');
+        if ($new_key !== '' && preg_match('/[\x00-\x1f\x7f]/', $new_key)) {
+            add_settings_error(self::KEY, 'alerts_api_key', 'API-nyckeln innehåller ogiltiga tecken.', 'error');
+            $new_key = '';
         }
+        $out['alerts_api_key'] = !empty($raw['alerts_api_key_clear']) ? '' : ($new_key !== '' ? $new_key : $existing['alerts_api_key']);
         delete_transient(self::CACHE);
+        delete_transient(self::ALERT_CACHE);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
@@ -118,7 +217,7 @@ class ArcWind_Init_OneUptime {
 
     public static function activate() {
         wp_clear_scheduled_hook(self::HOOK);
-        $options = (array) get_option(self::KEY, []);
+        $options = self::options();
         if (!empty($options['enabled']) && !empty($options['heartbeat_enabled']) &&
             self::valid_heartbeat_url(self::api_text($options['heartbeat_url'] ?? ''))) {
             wp_schedule_event(time() + 60, 'arcwind_every_minute', self::HOOK);
@@ -135,6 +234,7 @@ class ArcWind_Init_OneUptime {
         delete_option(self::KEY);
         delete_option(self::HEARTBEAT_HEALTH);
         delete_transient(self::CACHE);
+        delete_transient(self::ALERT_CACHE);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
         delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
@@ -313,11 +413,11 @@ class ArcWind_Init_OneUptime {
         error_log('ArcWind Init OneUptime ' . $endpoint . ': ' . $reason);
     }
 
-    private function active_messages() {
+    private function active_messages($place) {
         $o = $this->options();
-        if (!$o['enabled'] || !$o['banner_enabled'] || !$o['status_page_id'] || !$o['status_url']) return [];
+        if (!$o['enabled'] || !$o['banner_' . $place] || !$o['status_page_id'] || !$o['status_url']) return [];
         $cached = get_transient(self::CACHE);
-        if ($cached !== false && is_array($cached)) return self::api_messages($cached);
+        if ($cached !== false && is_array($cached)) return $this->messages_for_place(self::api_messages($cached), $o, $place);
         $parsed = wp_parse_url($o['status_url']);
         if (!$parsed || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host'])) return [];
         $base = 'https://' . $parsed['host'];
@@ -326,12 +426,13 @@ class ArcWind_Init_OneUptime {
         $id = rawurlencode($o['status_page_id']);
         $messages = [];
         $resources = [
-            'incidents' => ['enabled' => $o['show_incidents'], 'key' => 'incidents', 'type' => 'incident'],
-            'announcements' => ['enabled' => $o['show_announcements'], 'key' => 'announcements', 'type' => 'announcement'],
-            'scheduled-maintenance-events' => ['enabled' => $o['show_maintenance'], 'key' => 'scheduledMaintenanceEvents', 'type' => 'maintenance'],
+            'incidents' => ['enabled' => $o['public_incidents'] || $o['admin_incidents'], 'key' => 'incidents', 'type' => 'incident'],
+            'announcements' => ['enabled' => $o['public_announcements'] || $o['admin_announcements'], 'key' => 'announcements', 'type' => 'announcement'],
+            'scheduled-maintenance-events' => ['enabled' => $o['public_maintenance'] || $o['admin_maintenance'], 'key' => 'scheduledMaintenanceEvents', 'type' => 'maintenance'],
         ];
         foreach ($resources as $endpoint => $config) {
             if (!$config['enabled']) continue;
+            $added = 0;
             $json = self::request_api($api . $endpoint . '/' . $id, $endpoint, 'GET', 5);
             if (is_wp_error($json)) continue;
             if (!isset($json[$config['key']]) || !is_array($json[$config['key']])) {
@@ -371,11 +472,136 @@ class ArcWind_Init_OneUptime {
                 }
                 $messages[] = ['type' => $config['type'], 'title' => $title, 'url' => $o['status_url'],
                     'id' => self::api_id($record['_id'] ?? $record['id'] ?? '')];
-                if (count($messages) >= 10) break 2;
+                if (++$added >= 10) break;
             }
         }
         set_transient(self::CACHE, $messages, MINUTE_IN_SECONDS);
-        return $messages;
+        return $this->messages_for_place($messages, $o, $place);
+    }
+
+    private function messages_for_place($messages, $options, $place) {
+        $keys = ['incident' => 'incidents', 'announcement' => 'announcements', 'maintenance' => 'maintenance'];
+        return array_slice(array_values(array_filter($messages, function ($message) use ($options, $place, $keys) {
+            return !empty($options[$place . '_' . $keys[$message['type']]]);
+        })), 0, 10);
+    }
+
+    private static function alert_api_list($host, $key, $resource, $body) {
+        $url = $host . '/api/' . $resource . '/get-list?skip=0&limit=100';
+        try {
+            $response = wp_safe_remote_post($url, [
+                'timeout' => 5, 'redirection' => 0, 'sslverify' => true,
+                'headers' => ['Content-Type' => 'application/json', 'ApiKey' => $key],
+                'body' => wp_json_encode($body),
+            ]);
+        } catch (Throwable $error) {
+            self::api_diagnostic($resource, 'request exception');
+            return null;
+        }
+        if (is_wp_error($response) || !is_array($response)) {
+            self::api_diagnostic($resource, 'request failed');
+            return null;
+        }
+        $code = wp_remote_retrieve_response_code($response);
+        if (!is_int($code) || $code < 200 || $code >= 300) {
+            self::api_diagnostic($resource, 'HTTP ' . (is_int($code) ? $code : 'unknown'));
+            return null;
+        }
+        $data = self::parse_api_json(wp_remote_retrieve_body($response));
+        if (is_wp_error($data) || !isset($data['data']) || !is_array($data['data'])) {
+            self::api_diagnostic($resource, 'invalid response');
+            return null;
+        }
+        return array_values(array_filter($data['data'], 'is_array'));
+    }
+
+    private static function safe_monitor_id($value) {
+        $id = self::api_id($value);
+        return preg_match('/^[A-Za-z0-9._-]+$/', $id) ? $id : '';
+    }
+
+    public static function status_page_monitor_ids($overview) {
+        if (!is_array($overview) || !isset($overview['statusPageResources']) || !is_array($overview['statusPageResources'])) return [];
+        $ids = [];
+        $groups = [];
+        foreach ($overview['statusPageResources'] as $resource) {
+            if (!is_array($resource)) continue;
+            $monitor = self::safe_monitor_id($resource['monitorId'] ?? $resource['monitor'] ?? '');
+            if ($monitor !== '') $ids[$monitor] = true;
+            $group = self::safe_monitor_id($resource['monitorGroupId'] ?? $resource['monitorGroup'] ?? '');
+            if ($group !== '') $groups[] = $group;
+        }
+        $mapping = $overview['monitorsInGroup'] ?? [];
+        $seen = [];
+        while ($groups && count($seen) < 100) {
+            $group = array_shift($groups);
+            if (isset($seen[$group])) continue;
+            $seen[$group] = true;
+            $members = is_array($mapping) ? ($mapping[$group] ?? []) : [];
+            if (!is_array($members)) continue;
+            foreach ($members as $key => $member) {
+                $monitor = '';
+                if (is_string($key) && !ctype_digit($key)) $monitor = self::safe_monitor_id($key);
+                if (!$monitor && is_array($member)) {
+                    $monitor = self::safe_monitor_id($member['monitorId'] ?? $member['monitor'] ?? $member['_id'] ?? '');
+                    $nested = self::safe_monitor_id($member['monitorGroupId'] ?? '');
+                    if ($nested !== '' && !isset($seen[$nested])) $groups[] = $nested;
+                } elseif (!$monitor) {
+                    $monitor = self::safe_monitor_id($member);
+                }
+                if ($monitor !== '') $ids[$monitor] = true;
+            }
+        }
+        return array_keys($ids);
+    }
+
+    private static function active_alerts() {
+        $o = self::options();
+        if (!$o['enabled'] || !$o['alerts_admin'] || !$o['host'] || !$o['status_page_id'] || !$o['alerts_api_key']) return [];
+        $cached = get_transient(self::ALERT_CACHE);
+        if (is_array($cached)) return $cached;
+        $overview = self::request_api($o['host'] . '/status-page-api/overview/' . rawurlencode($o['status_page_id']), 'alert-page-overview', 'GET', 5);
+        $monitor_ids = is_wp_error($overview) ? [] : self::status_page_monitor_ids($overview);
+        if (!$monitor_ids) {
+            set_transient(self::ALERT_CACHE, [], MINUTE_IN_SECONDS);
+            return [];
+        }
+        $allowed = array_fill_keys($monitor_ids, true);
+        $states = self::alert_api_list($o['host'], $o['alerts_api_key'], 'alert-state', [
+            'select' => ['_id' => true, 'name' => true, 'isResolvedState' => true],
+        ]);
+        if ($states === null) {
+            set_transient(self::ALERT_CACHE, [], MINUTE_IN_SECONDS);
+            return [];
+        }
+        $alerts = [];
+        $queried_states = 0;
+        foreach ($states as $state) {
+            if (!array_key_exists('isResolvedState', $state) || !empty($state['isResolvedState'])) continue;
+            $state_id = self::api_id($state['_id'] ?? '');
+            if (!preg_match('/^[A-Za-z0-9._-]+$/', $state_id)) continue;
+            if (++$queried_states > 10) break;
+            $records = self::alert_api_list($o['host'], $o['alerts_api_key'], 'alert', [
+                'select' => ['_id' => true, 'title' => true, 'description' => true, 'currentAlertStateId' => true, 'monitorId' => true, 'createdAt' => true],
+                'query' => ['currentAlertStateId' => $state_id],
+                'sort' => ['createdAt' => -1],
+            ]);
+            if ($records === null) continue;
+            foreach ($records as $record) {
+                if (self::api_id($record['currentAlertStateId'] ?? '') !== $state_id) continue;
+                $monitor_id = self::safe_monitor_id($record['monitorId'] ?? '');
+                if ($monitor_id === '' || !isset($allowed[$monitor_id])) continue;
+                $title = sanitize_text_field(self::api_text($record['title'] ?? ''));
+                if ($title === '') continue;
+                $alerts[] = ['title' => $title, 'description' => trim(self::api_text($record['description'] ?? '')),
+                    'state' => sanitize_text_field(self::api_text($state['name'] ?? '')),
+                    'created' => self::parse_api_timestamp($record['createdAt'] ?? null) ?? 0];
+            }
+        }
+        usort($alerts, function ($a, $b) { return $b['created'] <=> $a['created']; });
+        $alerts = array_slice($alerts, 0, 10);
+        set_transient(self::ALERT_CACHE, $alerts, MINUTE_IN_SECONDS);
+        return $alerts;
     }
 
     public function banner_styles() {
@@ -386,7 +612,7 @@ class ArcWind_Init_OneUptime {
 
     public function render_banner() {
         if (!$this->options()['banner_public']) return;
-        $items = $this->active_messages();
+        $items = $this->active_messages('public');
         if (!$items) return;
         echo '<div id="arcwind-oneuptime-banner" role="region" aria-label="Driftinformation">';
         foreach ($items as $item) {
@@ -403,10 +629,28 @@ class ArcWind_Init_OneUptime {
     }
 
     public function render_admin_notice() {
-        if (!$this->options()['banner_admin']) return;
-        $items = $this->active_messages();
-        foreach ($items as $item) {
-            echo '<div class="notice notice-info"><p><strong>' . esc_html(ucfirst($item['type'])) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
+        if ($this->options()['banner_admin']) {
+            $items = $this->active_messages('admin');
+            foreach ($items as $item) {
+                echo '<div class="notice notice-info inline"><p><strong>' . esc_html(ucfirst($item['type'])) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
+            }
+        }
+        if (isset($_GET['page']) && $_GET['page'] === 'arcwind_init') return;
+        self::render_alert_notice();
+    }
+
+    public static function render_alert_notice() {
+        if (!current_user_can('manage_options')) return;
+        $alerts = self::active_alerts();
+        if ($alerts) {
+            echo '<div class="notice notice-warning inline arcwind-oneuptime-alerts"><p><strong>Aktiva alerts för statussidan</strong></p><ul style="list-style:none;padding-left:0">';
+            foreach ($alerts as $alert) {
+                echo '<li><details style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">' . esc_html($alert['title']);
+                if ($alert['state'] !== '') echo ' <span class="description" style="font-weight:normal">(' . esc_html($alert['state']) . ')</span>';
+                $description = $alert['description'] ?? '';
+                echo '</summary><p style="white-space:pre-wrap;margin:8px 0 4px 18px">' . ($description !== '' ? esc_html($description) : 'Ingen beskrivning finns.') . '</p></details></li>';
+            }
+            echo '</ul></div>';
         }
     }
 }

@@ -18,9 +18,9 @@ try {
     $sanitized = $plugin->sanitize_settings(['feedback_enabled' => 0]);
     arcwind_smoke_check(isset($sanitized['feedback_enabled']) && $sanitized['feedback_enabled'] === 0, 'Feedback toggle failed');
     $oneuptime = new ArcWind_Init_OneUptime();
-    $options = $oneuptime->sanitize(['enabled' => 1, 'banner_enabled' => 1, 'banner_public' => 1, 'banner_admin' => 1,
-        'status_url' => 'https://example.com', 'status_page_id' => 'page-1',
-        'show_incidents' => 1, 'show_announcements' => 1, 'show_maintenance' => 1]);
+    $options = $oneuptime->sanitize(['host' => 'https://example.com', 'banner_public' => 1, 'banner_admin' => 1,
+        'status_page_id' => 'page-1', 'public_incidents' => 1, 'admin_incidents' => 1,
+        'public_announcements' => 1, 'admin_announcements' => 1, 'public_maintenance' => 1, 'admin_maintenance' => 1]);
     arcwind_smoke_check($options['enabled'] === 1, 'OneUptime settings sanitization failed');
     update_option(ArcWind_Init_OneUptime::KEY, $options, false);
     wp_set_current_user(1);
@@ -32,7 +32,9 @@ try {
     update_option(ArcWind_Init::OPTION_KEY, $secret_settings, false);
     $secret_oneuptime = $options;
     $secret_oneuptime['heartbeat_enabled'] = 1;
+    $secret_oneuptime['heartbeat_secret'] = 'secret-token';
     $secret_oneuptime['heartbeat_url'] = 'https://example.com/heartbeat/secret-token';
+    $secret_oneuptime['alerts_api_key'] = 'private-alert-key';
     update_option(ArcWind_Init_OneUptime::KEY, $secret_oneuptime, false);
     foreach (['posthog', 'feedback', 'oneuptime', 'diagnostics'] as $tab) {
         $_GET['tab'] = $tab;
@@ -40,11 +42,20 @@ try {
         $plugin->render_settings_page();
         $html = ob_get_clean();
         arcwind_smoke_check(strpos($html, 'ArcWind Init') !== false, 'Settings tab did not render: ' . $tab);
-        arcwind_smoke_check(strpos($html, 'secret-token') === false, 'Settings page leaked a secret: ' . $tab);
+        if ($tab !== 'oneuptime') arcwind_smoke_check(strpos($html, 'secret-token') === false, 'Settings page leaked a secret: ' . $tab);
+        arcwind_smoke_check(strpos($html, 'private-alert-key') === false, 'Settings page leaked the alert API key: ' . $tab);
         if ($tab === 'posthog') {
             foreach (['api_host', 'ui_host', 'region', 'defaults', 'person_profiles'] as $field) {
                 arcwind_smoke_check(strpos($html, 'arcwind_init_settings[' . $field . ']') !== false, 'PostHog field missing: ' . $field);
             }
+        }
+        if ($tab === 'oneuptime') {
+            arcwind_smoke_check(substr_count($html, '<table class="form-table"') === 1, 'OneUptime settings did not use one table');
+            foreach (['host', 'status_page_id', 'public_incidents', 'admin_incidents', 'heartbeat_secret', 'alerts_admin'] as $field) {
+                arcwind_smoke_check(strpos($html, 'arcwind_init_oneuptime[' . $field . ']') !== false, 'OneUptime field missing: ' . $field);
+            }
+            arcwind_smoke_check(strpos($html, 'arcwind_init_oneuptime[alerts_api_key_clear]') !== false, 'Saved alert key did not have a remove button');
+            arcwind_smoke_check(strpos($html, 'name="arcwind_init_oneuptime[alerts_api_key]"') === false, 'Alert key input appeared while a key was saved');
         }
     }
     ArcWind_Init_OneUptime::activate();
