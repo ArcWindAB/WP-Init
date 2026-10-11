@@ -52,7 +52,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_connection',
             __('PostHog-anslutning', 'arcwind-init'),
             function () {
-                echo '<p>Välj region och ange webb-API, PostHogs gränssnitt, projekt-ID och projekt-token.</p>';
+                echo '<p>' . esc_html__('Välj region och ange projekt-token. Ange egna API- och UI-värdar när du vill använda andra adresser.', 'arcwind-init') . '</p>';
             },
             'arcwind_init_posthog'
         );
@@ -71,7 +71,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_main',
             __('Dashboardstatistik', 'arcwind-init'),
             function () {
-                echo '<p>Anslut PostHog till statistikwidgeten i WordPress-admin.</p>';
+                echo '<p>' . esc_html__('Anslut PostHog till statistikwidgeten i WordPress-admin.', 'arcwind-init') . '</p>';
             },
             'arcwind_init_posthog'
         );
@@ -82,7 +82,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_frontend',
             __('Webbspårning (webbläsare)', 'arcwind-init'),
             function () {
-                echo '<p>Aktivera PostHog på din webbplats med din publika API-nyckel (phc_...). Snippet laddas alltid; inloggade användare identifieras.</p>';
+                echo '<p>' . esc_html__('Aktivera PostHog på din webbplats med din publika API-nyckel (phc_...). Inloggade användare identifieras när spårning är aktiv.', 'arcwind-init') . '</p>';
             },
             'arcwind_init_posthog'
         );
@@ -103,7 +103,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_feedback',
             __('Feedback-widget', 'arcwind-init'),
             function () {
-                echo '<p>Ställ in kort-UUID som används av knappen <em>“Rapportera fel eller önska funktion”</em> (öppnar <code>https://t.arc.vin/s/{UUID}</code>).</p>';
+                echo '<p>' . wp_kses_post(__('Ställ in kort-UUID som används av knappen <em>“Rapportera fel eller önska funktion”</em> (öppnar <code>https://t.arc.vin/s/{UUID}</code>).', 'arcwind-init')) . '</p>';
             },
             'arcwind_init_feedback_tab'
         );
@@ -118,7 +118,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_errors',
             __('Felspårning', 'arcwind-init'),
             function () {
-                echo '<p>Skicka fel från dashboardens PostHog-frågor som händelser till PostHog med projekt-token.</p>';
+                echo '<p>' . esc_html__('Skicka fel från dashboardens PostHog-frågor som händelser till PostHog med projekt-token.', 'arcwind-init') . '</p>';
             },
             'arcwind_init_posthog'
         );
@@ -189,11 +189,11 @@ trait ArcWind_Init_Settings_Trait {
         // The tab only selects page content; no action is performed here.
         $tab = isset($_GET['tab']) && is_string($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'posthog'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if (!in_array($tab, ['posthog', 'feedback', 'oneuptime', 'diagnostics'], true)) $tab = 'posthog';
-        $tabs = ['posthog' => 'PostHog', 'feedback' => 'Feedback', 'oneuptime' => 'OneUptime', 'diagnostics' => 'Diagnostik'];
-        echo '<div class="wrap"><h1>ArcWind Init – Inställningar</h1><nav class="nav-tab-wrapper" aria-label="Integrationer">';
+        $tabs = ['posthog' => 'PostHog', 'feedback' => 'Feedback', 'oneuptime' => 'OneUptime', 'diagnostics' => __('Diagnostik', 'arcwind-init')];
+        echo '<div class="wrap"><h1>' . esc_html__('ArcWind Init – Inställningar', 'arcwind-init') . '</h1><nav class="nav-tab-wrapper" aria-label="' . esc_attr__('Integrationer', 'arcwind-init') . '">';
         foreach ($tabs as $key => $label) {
             $url = add_query_arg(['page' => 'arcwind_init', 'tab' => $key], admin_url('options-general.php'));
-            echo '<a class="nav-tab ' . ($tab === $key ? 'nav-tab-active' : '') . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
+            echo '<a class="nav-tab ' . ($tab === $key ? 'nav-tab-active' : '') . '" href="' . esc_url($url) . '"' . ($tab === $key ? ' aria-current="page"' : '') . '>' . esc_html($label) . '</a>';
         }
         echo '</nav>';
         if (class_exists('ArcWind_Init_OneUptime')) ArcWind_Init_OneUptime::render_alert_notice();
@@ -228,7 +228,7 @@ trait ArcWind_Init_Settings_Trait {
 
     private function render_posthog_settings_table() {
         $settings = $this->options();
-        $api_ready = !empty($settings['api_host']) && wp_parse_url($settings['api_host'], PHP_URL_SCHEME) === 'https';
+        $api_ready = empty($settings['api_host']) || wp_parse_url($settings['api_host'], PHP_URL_SCHEME) === 'https';
         $project_ready = !empty($settings['project_id']);
         $token_ready = !empty($settings['public_api_key']);
         $ui_ready = empty($settings['ui_host']) || wp_parse_url($settings['ui_host'], PHP_URL_SCHEME) === 'https';
@@ -245,29 +245,29 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_errors' => empty($settings['enable_error_tracking']) ? 'inactive' :
                 ($errors_ready ? 'active' : ($token_ready ? 'error' : 'inactive')),
         ];
-        $icons = ['active' => ['yes-alt', 'Aktiv'], 'inactive' => ['minus', 'Av'], 'error' => ['warning', 'Behöver konfigureras']];
+        $icons = ['active' => ['yes-alt', __('Aktiv', 'arcwind-init')], 'inactive' => ['minus', __('Av', 'arcwind-init')], 'error' => ['warning', __('Behöver konfigureras', 'arcwind-init')]];
         $groups = [
-            'arcwind_init_connection' => ['PostHog-anslutning', 'Välj region och ange adresserna för webbtrafik och gränssnitt, projekt-ID och publik projekt-token.', true, ''],
-            'arcwind_init_frontend' => ['Webbspårning', 'Välj hur PostHog spårar besök och interaktioner samt hur SDK:n laddas på webbplatsen.', $api_ready && $token_ready, 'Fyll i API-värd och projekt-token ovan för att låsa upp webbspårning.'],
-            'arcwind_init_main' => ['Dashboardstatistik', 'Visa statistik i WordPress-admin. Frågor till PostHog använder UI-värden och en personlig API-nyckel.', $project_ready, 'Fyll i projekt-ID ovan för att låsa upp dashboardstatistik.'],
-            'arcwind_init_errors' => ['Felspårning', 'Skicka fel från dashboardens PostHog-frågor via API-värden med projekt-token.', $api_ready && $token_ready, 'Fyll i API-värd och projekt-token ovan för att låsa upp felspårning.'],
+            'arcwind_init_connection' => [__('PostHog-anslutning', 'arcwind-init'), __('Välj region och ange projekt-token. API-värd och UI-värd är valfria; tomma fält använder regionens adresser.', 'arcwind-init'), true, ''],
+            'arcwind_init_frontend' => [__('Webbspårning', 'arcwind-init'), __('Välj hur PostHog spårar besök och interaktioner samt hur SDK:n laddas på webbplatsen.', 'arcwind-init'), $api_ready && $token_ready, __('Fyll i projekt-token ovan för att låsa upp webbspårning.', 'arcwind-init')],
+            'arcwind_init_main' => [__('Dashboardstatistik', 'arcwind-init'), __('Visa statistik i WordPress-admin. Frågor till PostHog använder UI-värden och en personlig API-nyckel.', 'arcwind-init'), $project_ready, __('Fyll i projekt-ID ovan för att låsa upp dashboardstatistik.', 'arcwind-init')],
+            'arcwind_init_errors' => [__('Felspårning', 'arcwind-init'), __('Skicka fel från dashboardens PostHog-frågor via API-värden med projekt-token.', 'arcwind-init'), $api_ready && $token_ready, __('Fyll i projekt-token ovan för att låsa upp felspårning.', 'arcwind-init')],
         ];
         echo '<style>#arcwind-posthog-settings tbody[hidden]{display:none}#arcwind-posthog-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-posthog-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-posthog-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}#arcwind-posthog-settings .arcwind-section-status{display:inline-flex;vertical-align:middle;margin-left:8px}#arcwind-posthog-settings .arcwind-section-status-active{color:#008a20}#arcwind-posthog-settings .arcwind-section-status-inactive{color:#646970}#arcwind-posthog-settings .arcwind-section-status-error{color:#b26200}</style>';
-        echo '<p class="description">Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.</p>';
+        echo '<p class="description">' . esc_html__('Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.', 'arcwind-init') . '</p>';
         echo '<table class="form-table" role="presentation" id="arcwind-posthog-settings">';
         foreach ($groups as $section => $details) {
             $open = $section === 'arcwind_init_connection';
             $locked = !$details[2];
             $target = $section . '_fields';
             $state = $states[$section];
-            $status_label = 'Sparad status: ' . $icons[$state][1];
+            $status_label = __('Sparad status:', 'arcwind-init') . ' ' . $icons[$state][1];
             echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><span class="arcwind-section-status arcwind-section-status-' . esc_attr($state) . '" role="img" aria-label="' . esc_attr($status_label) . '" title="' . esc_attr($status_label) . '"><span class="dashicons dashicons-' . esc_attr($icons[$state][0]) . '" aria-hidden="true"></span></span><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($details[3] !== '' ? ' <span id="' . esc_attr($section) . '_required"' . ($locked ? '' : ' hidden') . '>' . esc_html($details[3]) . '</span>' : '') . '</p></th></tr></tbody>';
             echo '<tbody id="' . esc_attr($target) . '"' . ($open ? '' : ' hidden') . '>';
             do_settings_fields('arcwind_init_posthog', $section);
             echo '</tbody>';
         }
         echo '</table>';
-        echo '<script>(function(){var table=document.getElementById("arcwind-posthog-settings");if(!table)return;var api=document.getElementById("arcwind_init_api_host"),project=document.getElementById("arcwind_init_project_id"),token=document.getElementById("arcwind_init_public_api_key"),sections={arcwind_init_frontend_fields:function(){return !!(api.value.trim()&&token.value.trim())},arcwind_init_main_fields:function(){return !!project.value.trim()},arcwind_init_errors_fields:function(){return !!(api.value.trim()&&token.value.trim())}};function gate(){Object.keys(sections).forEach(function(target){var button=table.querySelector("button[aria-controls="+target+"]"),rows=document.getElementById(target),hint=document.getElementById(target.replace(/_fields$/,"_required")),ready=sections[target]();button.disabled=!ready;if(!ready){rows.hidden=true;button.setAttribute("aria-expanded","false");button.querySelector(".dashicons").className="dashicons dashicons-arrow-right-alt2"}hint.hidden=ready})}api.addEventListener("input",gate);project.addEventListener("input",gate);token.addEventListener("input",gate);table.addEventListener("click",function(event){var button=event.target.closest("button[aria-controls]");if(!button||!table.contains(button)||button.disabled)return;var rows=document.getElementById(button.getAttribute("aria-controls"));if(!rows)return;rows.hidden=!rows.hidden;button.setAttribute("aria-expanded",rows.hidden?"false":"true");var icon=button.querySelector(".dashicons");if(icon)icon.className="dashicons dashicons-arrow-"+(rows.hidden?"right":"down")+"-alt2"})})();</script>';
+        echo '<script>(function(){var table=document.getElementById("arcwind-posthog-settings");if(!table)return;var project=document.getElementById("arcwind_init_project_id"),token=document.getElementById("arcwind_init_public_api_key"),sections={arcwind_init_frontend_fields:function(){return !!token.value.trim()},arcwind_init_main_fields:function(){return !!project.value.trim()},arcwind_init_errors_fields:function(){return !!token.value.trim()}};function gate(){Object.keys(sections).forEach(function(target){var button=table.querySelector("button[aria-controls="+target+"]"),rows=document.getElementById(target),hint=document.getElementById(target.replace(/_fields$/,"_required")),ready=sections[target]();button.disabled=!ready;if(!ready){rows.hidden=true;button.setAttribute("aria-expanded","false");button.querySelector(".dashicons").className="dashicons dashicons-arrow-right-alt2"}hint.hidden=ready})}project.addEventListener("input",gate);token.addEventListener("input",gate);table.addEventListener("click",function(event){var button=event.target.closest("button[aria-controls]");if(!button||!table.contains(button)||button.disabled)return;var rows=document.getElementById(button.getAttribute("aria-controls"));if(!rows)return;rows.hidden=!rows.hidden;button.setAttribute("aria-expanded",rows.hidden?"false":"true");var icon=button.querySelector(".dashicons");if(icon)icon.className="dashicons dashicons-arrow-"+(rows.hidden?"right":"down")+"-alt2"})})();</script>';
     }
 
     /* ===== Field renderers ===== */
@@ -276,72 +276,72 @@ trait ArcWind_Init_Settings_Trait {
     }
 
     public function render_input_project_id()        { $o = $this->options(); ?>
-        <input id="arcwind_init_project_id" type="text" style="width:200px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[project_id]" value="<?php echo esc_attr($o['project_id'] ?? ''); ?>" placeholder="t.ex. 1234" />
-        <p class="description">Behövs för statistikwidgeten i admin. Webbspårningen använder i stället projekt-token.</p><?php
+        <input id="arcwind_init_project_id" type="text" style="width:200px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[project_id]" aria-label="<?php echo esc_attr__('Projekt-ID', 'arcwind-init'); ?>" value="<?php echo esc_attr($o['project_id'] ?? ''); ?>" placeholder="t.ex. 1234" />
+        <p class="description"><?php echo esc_html__('Behövs för statistikwidgeten i admin. Webbspårningen använder i stället projekt-token.', 'arcwind-init'); ?></p><?php
     }
     public function render_input_personal_api_key()  { $o = $this->options(); ?>
         <?php if (!empty($o['personal_api_key'])): ?>
-            <p class="description">En API-nyckel är sparad.</p>
-            <button type="submit" class="button" name="<?php echo esc_attr(self::OPTION_KEY); ?>[personal_api_key_clear]" value="1">Ta bort API-nyckel och spara ändringar</button>
+            <p class="description"><?php echo esc_html__('En API-nyckel är sparad.', 'arcwind-init'); ?></p>
+            <button type="submit" class="button" name="<?php echo esc_attr(self::OPTION_KEY); ?>[personal_api_key_clear]" value="1"><?php echo esc_html__('Ta bort API-nyckel och spara ändringar', 'arcwind-init'); ?></button>
         <?php else: ?>
-            <input type="password" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[personal_api_key]" value="" placeholder="phx_..." autocomplete="new-password" />
+            <input type="password" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[personal_api_key]" aria-label="<?php echo esc_attr__('Personlig API-nyckel', 'arcwind-init'); ?>" value="" placeholder="phx_..." autocomplete="new-password" />
         <?php endif; ?><?php
     }
     public function render_checkbox_enable_tracking(){ $o = $this->options(); ?>
-        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_tracking]" value="1" <?php checked(!empty($o['enable_tracking'])); ?> /> Aktivera PostHog-spårning på webbplatsen</label><?php
+        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_tracking]" value="1" <?php checked(!empty($o['enable_tracking'])); ?> /> <?php echo esc_html__('Aktivera PostHog-spårning på webbplatsen', 'arcwind-init'); ?></label><?php
     }
     public function render_input_public_api_key()    { $o = $this->options(); ?>
-        <input id="arcwind_init_public_api_key" type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[public_api_key]" value="<?php echo esc_attr($o['public_api_key'] ?? ''); ?>" placeholder="phc_..." />
-        <p class="description">Publik projekt-token för webbspårning och felhändelser. Den börjar normalt med <code>phc_</code>.</p><?php
+        <input id="arcwind_init_public_api_key" type="text" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[public_api_key]" aria-label="<?php echo esc_attr__('Projekt-token', 'arcwind-init'); ?>" value="<?php echo esc_attr($o['public_api_key'] ?? ''); ?>" placeholder="phc_..." />
+        <p class="description"><?php echo wp_kses_post(__('Publik projekt-token för webbspårning och felhändelser. Den börjar med <code>phc_</code>.', 'arcwind-init')); ?></p><?php
     }
     public function render_select_region()           { $o = $this->options(); $region = $o['region'] ?? 'eu'; ?>
-        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[region]">
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[region]" aria-label="<?php echo esc_attr__('PostHog-region', 'arcwind-init'); ?>">
             <option value="eu" <?php selected($region, 'eu'); ?>>EU</option>
             <option value="us" <?php selected($region, 'us'); ?>>US</option>
-        </select><p class="description">Väljer direkta standardadresser för både <code>api_host</code> och <code>ui_host</code>. Egna adresser ändras inte när du byter region.</p><?php
+        </select><p class="description"><?php echo wp_kses_post(__('Väljer direkta standardadresser för både <code>api_host</code> och <code>ui_host</code>. Egna adresser ändras inte när du byter region.', 'arcwind-init')); ?></p><?php
     }
     public function render_input_api_host()          { $o = $this->options(); ?>
-        <input id="arcwind_init_api_host" type="url" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[api_host]" value="<?php echo esc_attr($o['api_host'] ?? ''); ?>" placeholder="https://eu.i.posthog.com" />
-        <p class="description">Adress för SDK-filer och event från webbläsaren samt serverns felhändelser. Ange PostHogs API-värd eller din HTTPS reverse proxy, inklusive eventuell sökväg. Tomt använder vald regions direktadress. På äldre installationer behålls tidigare värd vid första sparningen.</p><?php
+        <input id="arcwind_init_api_host" type="url" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[api_host]" aria-label="<?php echo esc_attr__('PostHog API-värd eller proxy', 'arcwind-init'); ?>" value="<?php echo esc_attr($o['api_host'] ?? ''); ?>" placeholder="https://eu.i.posthog.com" />
+        <p class="description"><?php echo esc_html__('Adress för SDK-filer och händelser från webbläsaren samt serverns felhändelser. Ange PostHogs API-värd eller din HTTPS-proxy, inklusive eventuell sökväg. Tomt använder vald regions direktadress. På äldre installationer behålls tidigare värd vid första sparningen.', 'arcwind-init'); ?></p><?php
     }
     public function render_input_ui_host()           { $o = $this->options(); ?>
-        <input type="url" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ui_host]" value="<?php echo esc_attr($o['ui_host'] ?? ''); ?>" placeholder="https://eu.posthog.com" />
-        <p class="description">Adress till PostHogs gränssnitt, toolbar och privata Query API. Vid reverse proxy är detta normalt PostHogs riktiga domän. Tomt använder vald region.</p><?php
+        <input type="url" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[ui_host]" aria-label="<?php echo esc_attr__('PostHog UI-värd', 'arcwind-init'); ?>" value="<?php echo esc_attr($o['ui_host'] ?? ''); ?>" placeholder="https://eu.posthog.com" />
+        <p class="description"><?php echo esc_html__('Adress till PostHogs gränssnitt, verktygsfält och privata Query API. Vid proxy anger du PostHogs gränssnittsvärd. Tomt använder vald region.', 'arcwind-init'); ?></p><?php
     }
     public function render_input_defaults()          { $o = $this->options(); ?>
-        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[defaults]">
-            <option value="" <?php selected($o['defaults'] ?? '', ''); ?>>SDK-standard (ingen vald profil)</option>
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[defaults]" aria-label="<?php echo esc_attr__('SDK defaults', 'arcwind-init'); ?>">
+            <option value="" <?php selected($o['defaults'] ?? '', ''); ?>><?php echo esc_html__('SDK-standard (ingen vald profil)', 'arcwind-init'); ?></option>
             <?php foreach (self::posthog_defaults_dates() as $date): ?>
                 <option value="<?php echo esc_attr($date); ?>" <?php selected($o['defaults'] ?? '', $date); ?>><?php echo esc_html($date); ?></option>
             <?php endforeach; ?>
         </select>
-        <p class="description">Väljer en daterad profil för PostHogs standardbeteenden. Nyare datum kan ändra SDK:ns förval; dina val för sidvisning och autocapture gäller fortfarande. SDK-standard utelämnar <code>defaults</code>.</p><?php
+        <p class="description"><?php echo wp_kses_post(__('Väljer en daterad profil för PostHogs standardbeteenden. Nyare datum kan ändra SDK:ns förval; dina val för sidvisning och autocapture gäller fortfarande. SDK-standard utelämnar <code>defaults</code>.', 'arcwind-init')); ?></p><?php
     }
     public function render_select_person_profiles()  { $o = $this->options(); $value = $o['person_profiles'] ?? ''; ?>
-        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[person_profiles]">
-            <option value="" <?php selected($value, ''); ?>>SDK-standard</option>
-            <option value="identified_only" <?php selected($value, 'identified_only'); ?>>Bara identifierade</option>
-            <option value="always" <?php selected($value, 'always'); ?>>Alltid</option>
-        </select><p class="description"><code>identified_only</code> skapar personprofiler för identifierade besökare; övriga händelser är anonyma. <code>always</code> skapar profiler även för anonyma besökare och kan öka antalet debiterade händelser. SDK-standard använder PostHogs eget förval.</p><?php
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[person_profiles]" aria-label="<?php echo esc_attr__('Person profiles', 'arcwind-init'); ?>">
+            <option value="" <?php selected($value, ''); ?>><?php echo esc_html__('SDK-standard', 'arcwind-init'); ?></option>
+            <option value="identified_only" <?php selected($value, 'identified_only'); ?>><?php echo esc_html__('Bara identifierade', 'arcwind-init'); ?></option>
+            <option value="always" <?php selected($value, 'always'); ?>><?php echo esc_html__('Alltid', 'arcwind-init'); ?></option>
+        </select><p class="description"><?php echo wp_kses_post(__('<code>identified_only</code> skapar personprofiler för identifierade besökare; övriga händelser är anonyma. <code>always</code> skapar profiler även för anonyma besökare och kan öka antalet debiterade händelser. SDK-standard använder PostHogs eget förval.', 'arcwind-init')); ?></p><?php
     }
     public function render_checkbox_capture_pageview(){ $o = $this->options(); ?>
-        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[capture_pageview]" value="1" <?php checked(!empty($o['capture_pageview'])); ?> /> Kör <code>capture_pageview</code> vid laddning</label>
-        <p class="description">Skickar en <code>$pageview</code> när sidan laddas så att besök syns i statistiken. Avmarkera om sidvisningar registreras på annat sätt.</p><?php
+        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[capture_pageview]" value="1" <?php checked(!empty($o['capture_pageview'])); ?> /> <?php echo wp_kses_post(__('Kör <code>capture_pageview</code> vid laddning', 'arcwind-init')); ?></label>
+        <p class="description"><?php echo wp_kses_post(__('Skickar en <code>$pageview</code> när sidan laddas så att besök syns i statistiken. Avmarkera om sidvisningar registreras på annat sätt.', 'arcwind-init')); ?></p><?php
     }
     public function render_checkbox_autocapture()    { $o = $this->options(); ?>
-        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[autocapture]" value="1" <?php checked(!empty($o['autocapture'])); ?> /> Aktivera <code>autocapture</code></label>
-        <p class="description">Låter PostHog registrera vanliga interaktioner automatiskt, till exempel klick och formulärhändelser. Avmarkera om du bara vill skicka sidvisningar och egna händelser.</p><?php
+        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[autocapture]" value="1" <?php checked(!empty($o['autocapture'])); ?> /> <?php echo wp_kses_post(__('Aktivera <code>autocapture</code>', 'arcwind-init')); ?></label>
+        <p class="description"><?php echo esc_html__('Låter PostHog registrera vanliga interaktioner automatiskt, till exempel klick och formulärhändelser. Avmarkera om du bara vill skicka sidvisningar och egna händelser.', 'arcwind-init'); ?></p><?php
     }
     public function render_select_load_position()    { $o = $this->options(); $val = $o['load_position'] ?? 'head'; ?>
-        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[load_position]">
-            <option value="head"   <?php selected($val, 'head'); ?>>Head – tidigt</option>
-            <option value="footer" <?php selected($val, 'footer'); ?>>Footer – senare</option>
-        </select><p class="description">Väljer var PostHog laddas på webbplatsen och i admin. Head startar spårningen tidigt; Footer väntar tills sidans innehåll har laddats längre.</p><?php
+        <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[load_position]" aria-label="<?php echo esc_attr__('Laddningsposition', 'arcwind-init'); ?>">
+            <option value="head"   <?php selected($val, 'head'); ?>><?php echo esc_html__('Head – tidigt', 'arcwind-init'); ?></option>
+            <option value="footer" <?php selected($val, 'footer'); ?>><?php echo esc_html__('Footer – senare', 'arcwind-init'); ?></option>
+        </select><p class="description"><?php echo esc_html__('Väljer var PostHog laddas på webbplatsen och i admin. Head startar spårningen tidigt; Footer väntar tills sidans innehåll har laddats längre.', 'arcwind-init'); ?></p><?php
     }
     public function render_checkbox_enable_error_tracking(){ $o = $this->options(); ?>
-        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_error_tracking]" value="1" <?php checked(!empty($o['enable_error_tracking'])); ?> /> Skicka fel från PostHog-statistiken som händelser</label><?php
+        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_error_tracking]" value="1" <?php checked(!empty($o['enable_error_tracking'])); ?> /> <?php echo esc_html__('Skicka fel från PostHog-statistiken som händelser', 'arcwind-init'); ?></label><?php
     }
     public function render_input_error_distinct_id() { $o = $this->options(); ?>
-        <input type="text" style="width:260px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[error_distinct_id]" value="<?php echo esc_attr($o['error_distinct_id'] ?? 'arcwind-init:server'); ?>" placeholder="arcwind-init:server" /><?php
+        <input type="text" style="width:260px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[error_distinct_id]" aria-label="<?php echo esc_attr__('Distinct ID för fel', 'arcwind-init'); ?>" value="<?php echo esc_attr($o['error_distinct_id'] ?? 'arcwind-init:server'); ?>" placeholder="arcwind-init:server" /><?php
     }
 }

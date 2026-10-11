@@ -15,13 +15,16 @@ restore_file() {
 }
 trap restore_file EXIT
 
-for module in class-arcwind-init-oneuptime.php class-arcwind-init-feedback-trait.php class-arcwind-init-settings-trait.php class-arcwind-init-github-updater.php; do
+for module in class-arcwind-init-oneuptime.php class-arcwind-init-oneuptime-dashboard.php class-arcwind-init-feedback-trait.php class-arcwind-init-settings-trait.php class-arcwind-init-github-updater.php; do
   disabled_file="$plugin_root/includes/$module"
   mv "$disabled_file" "$disabled_file.disabled"
   php "$wp_cli" eval 'if (!class_exists("ArcWind_Init")) { throw new RuntimeException("Plugin bootstrap failed"); }' --path="$wp_root" "${wp_args[@]}"
   curl -fsS "$base_url/" -o /dev/null
   curl -fsS "$base_url/wp-login.php" -o /dev/null
   curl -fsS "$base_url/index.php?rest_route=/" -o /dev/null
+  if [[ "$module" == class-arcwind-init-oneuptime-dashboard.php ]]; then
+    php "$wp_cli" eval 'ArcWind_Init_OneUptime::uninstall();' --path="$wp_root" "${wp_args[@]}"
+  fi
   restore_file
   disabled_file=''
 done

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: PostHog-spårning och dashboardstatistik, feedbacklänk samt OneUptime-status, driftinformation, alerts och heartbeat.
- * Version:     2.0.0
+ * Version:     2.0.1
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init

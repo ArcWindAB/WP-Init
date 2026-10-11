@@ -32,7 +32,7 @@ Release-ZIP-filen ska ha `arcwind-init/` som enda rotmapp, med `arcwind-init.php
 | Aktivera felspårning | på | Skickar fel från dashboardens PostHog Query API-frågor som händelser via serverns `api_host` när projekt-token finns. |
 | Distinct ID för fel | `arcwind-init:server` | ID för de felhändelserna. |
 
-PostHog-inställningarna visas i en gemensam tabell. **PostHog-anslutning** är öppen från början och innehåller region, API-värd, UI-värd, projekt-ID och projekt-token. Webbspårning innehåller även SDK defaults, person profiles och laddningsposition och öppnas när API-värd och projekt-token finns. Dashboardstatistik kräver projekt-ID och felspårning kräver API-värd och projekt-token. Ett låst avsnitt visas grått och kan öppnas direkt när dess fält fyllts i. UI-värden är valfri och används för PostHogs gränssnitt och privata Query API.
+PostHog-inställningarna visas i en gemensam tabell. **PostHog-anslutning** är öppen från början och innehåller region, API-värd, UI-värd, projekt-ID och projekt-token. Webbspårning innehåller även SDK defaults, person profiles och laddningsposition och öppnas när projekt-token finns. Felspårning kräver också projekt-token; båda använder vald regions API-värd när fältet är tomt. Dashboardstatistik kräver projekt-ID. Ett låst avsnitt visas grått och kan öppnas direkt när dess nödvändiga fält fyllts i. UI-värden är valfri och används för PostHogs gränssnitt och privata Query API.
 
 Ikoner bredvid avsnitten visar den sparade inställningens status: grön bock betyder aktiv, grått streck betyder av och orange varning betyder att något som behövs saknas. Ikonerna visar konfiguration, inte resultatet av ett anslutningstest.
 
@@ -109,7 +109,7 @@ Inställningar lagras i WordPress options och överlever filuppdateringar. En fe
 Bygg och validera en release lokalt:
 
 ```sh
-python3 scripts/build-release.py --tag v2.0.0
+python3 scripts/build-release.py --tag v2.0.1
 python3 scripts/build-release.py --validate-only
 ```
 

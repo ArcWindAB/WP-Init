@@ -51,7 +51,10 @@ function test_response($url) {
     return $responses[$matches[1]] ?? new WP_Error('unavailable', 'secret-token');
 }
 function esc_html($value) { if (!is_string($value)) throw new Exception('Non-string HTML value'); return htmlspecialchars($value, ENT_QUOTES); }
+function __($value) { return $value; }
+function esc_html__($value) { return esc_html($value); }
 function esc_attr($value) { return esc_html($value); }
+function esc_attr__($value) { return esc_attr($value); }
 function esc_js($value) { return esc_html($value); }
 function esc_url($value) { return esc_html($value); }
 function sanitize_key($value) { return strtolower(preg_replace('/[^a-z0-9_\-]/i', '', $value)); }
@@ -130,7 +133,7 @@ try {
     check($widget_title === 'Example status', 'Widget title did not use status page name');
     check(strpos($dashboard, 'OneUptime') === false && substr_count($dashboard, '<details') >= 3, 'Widget was not white labeled and collapsible');
     check(strpos($banner, 'Open incident') !== false && strpos($banner, 'Planned work') !== false, 'Valid banner missing messages');
-    check(strpos($notice, 'Open incident') !== false, 'Valid admin notice missing message');
+    check(strpos($notice, 'Driftstörning:') !== false && strpos($notice, 'Open incident') !== false, 'Admin notice did not use a localized incident label');
     $options['public_incidents'] = 0;
     $options['admin_incidents'] = 1;
     $transients = [];

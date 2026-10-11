@@ -76,34 +76,34 @@ class ArcWind_Init_OneUptime {
         register_setting('arcwind_init_oneuptime_group', self::KEY, [
             'type' => 'array', 'sanitize_callback' => [$this, 'sanitize'],
         ]);
-        add_settings_section('arcwind_oneuptime_connection', 'Statussida', function () {
-            echo '<p>Ange OneUptime-värden och statussidans ID. Statussidans adress skapas automatiskt.</p>';
+        add_settings_section('arcwind_oneuptime_connection', __('Statussida', 'arcwind-init'), function () {
+            echo '<p>' . esc_html__('Ange OneUptime-värden och statussidans ID. Statussidans adress skapas automatiskt.', 'arcwind-init') . '</p>';
         }, 'arcwind_init_oneuptime');
-        add_settings_section('arcwind_oneuptime_information', 'Driftinformation', function () {
-            echo '<p>Välj vilka aktuella händelser som ska visas på webbplatsen och i WordPress-admin.</p>';
+        add_settings_section('arcwind_oneuptime_information', __('Driftinformation', 'arcwind-init'), function () {
+            echo '<p>' . esc_html__('Välj vilka aktuella händelser som ska visas på webbplatsen och i WordPress-admin.', 'arcwind-init') . '</p>';
         }, 'arcwind_init_oneuptime');
-        add_settings_section('arcwind_oneuptime_heartbeat', 'Heartbeat', function () {
-            echo '<p>Heartbeat är en återkommande signal från webbplatsen till OneUptime. Skapa först en <strong>Incoming Request-monitor</strong> i OneUptime och ange dess heartbeat-ID nedan.</p>';
-            echo '<p>Signalen skickas med WP-Cron ungefär varje minut när webbplatsen får trafik. Använd extern cron för ett tillförlitligt minutintervall.</p>';
+        add_settings_section('arcwind_oneuptime_heartbeat', __('Heartbeat', 'arcwind-init'), function () {
+            echo '<p>' . wp_kses_post(__('Heartbeat är en återkommande signal från webbplatsen till OneUptime. Skapa först en <strong>Incoming Request-monitor</strong> i OneUptime och ange dess heartbeat-ID nedan.', 'arcwind-init')) . '</p>';
+            echo '<p>' . esc_html__('Signalen skickas med WP-Cron ungefär varje minut när webbplatsen får trafik. Använd extern cron för ett tillförlitligt minutintervall.', 'arcwind-init') . '</p>';
         }, 'arcwind_init_oneuptime');
-        add_settings_section('arcwind_oneuptime_alerts', 'Alerts', function () {
-            echo '<p>Visa olösta alerts för monitorerna på statussidan i WordPress-admin.</p>';
+        add_settings_section('arcwind_oneuptime_alerts', __('Alerts', 'arcwind-init'), function () {
+            echo '<p>' . esc_html__('Visa olösta alerts för monitorerna på statussidan i WordPress-admin.', 'arcwind-init') . '</p>';
         }, 'arcwind_init_oneuptime');
         $fields = [
-            'host' => ['OneUptime-värd', 'url', 'arcwind_oneuptime_connection'],
-            'status_page_id' => ['Statussidans ID', 'text', 'arcwind_oneuptime_connection'],
-            'banner_public' => ['Visa driftinformation på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
-            'public_incidents' => ['Visa incidenter på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
-            'public_announcements' => ['Visa meddelanden på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
-            'public_maintenance' => ['Visa planerade underhåll på webbplatsen', 'checkbox', 'arcwind_oneuptime_information'],
-            'banner_admin' => ['Visa driftinformation i admin', 'checkbox', 'arcwind_oneuptime_information'],
-            'admin_incidents' => ['Visa incidenter i admin', 'checkbox', 'arcwind_oneuptime_information'],
-            'admin_announcements' => ['Visa meddelanden i admin', 'checkbox', 'arcwind_oneuptime_information'],
-            'admin_maintenance' => ['Visa planerade underhåll i admin', 'checkbox', 'arcwind_oneuptime_information'],
-            'heartbeat_enabled' => ['Skicka heartbeat', 'checkbox', 'arcwind_oneuptime_heartbeat'],
-            'heartbeat_secret' => ['Heartbeat-ID', 'text', 'arcwind_oneuptime_heartbeat'],
-            'alerts_api_key' => ['API-nyckel för alerts', 'password', 'arcwind_oneuptime_alerts'],
-            'alerts_admin' => ['Visa alerts i admin', 'checkbox', 'arcwind_oneuptime_alerts'],
+            'host' => [__('OneUptime-värd', 'arcwind-init'), 'url', 'arcwind_oneuptime_connection'],
+            'status_page_id' => [__('Statussidans ID', 'arcwind-init'), 'text', 'arcwind_oneuptime_connection'],
+            'banner_public' => [__('Visa driftinformation på webbplatsen', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'public_incidents' => [__('Visa incidenter på webbplatsen', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'public_announcements' => [__('Visa meddelanden på webbplatsen', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'public_maintenance' => [__('Visa planerade underhåll på webbplatsen', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'banner_admin' => [__('Visa driftinformation i admin', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_incidents' => [__('Visa incidenter i admin', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_announcements' => [__('Visa meddelanden i admin', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'admin_maintenance' => [__('Visa planerade underhåll i admin', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_information'],
+            'heartbeat_enabled' => [__('Skicka heartbeat', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_heartbeat'],
+            'heartbeat_secret' => [__('Heartbeat-ID', 'arcwind-init'), 'text', 'arcwind_oneuptime_heartbeat'],
+            'alerts_api_key' => [__('API-nyckel för alerts', 'arcwind-init'), 'password', 'arcwind_oneuptime_alerts'],
+            'alerts_admin' => [__('Visa alerts i admin', 'arcwind-init'), 'checkbox', 'arcwind_oneuptime_alerts'],
         ];
         foreach ($fields as $key => $definition) {
             add_settings_field('arcwind_oneuptime_' . $key, $definition[0], function () use ($key, $definition) {
@@ -111,26 +111,26 @@ class ArcWind_Init_OneUptime {
                 $name = self::KEY . '[' . $key . ']';
                 if ($definition[1] === 'checkbox') {
                     echo '<input type="hidden" name="' . esc_attr($name) . '" value="0">';
-                    echo '<input type="checkbox" name="' . esc_attr($name) . '" value="1" ' . checked(!empty($settings[$key]), true, false) . '>';
+                    echo '<input type="checkbox" name="' . esc_attr($name) . '" value="1" aria-label="' . esc_attr($definition[0]) . '" ' . checked(!empty($settings[$key]), true, false) . '>';
                     return;
                 }
                 if ($key === 'alerts_api_key') {
                     if ($settings['alerts_api_key'] !== '') {
-                        echo '<p class="description">En API-nyckel är sparad.</p>';
-                        echo '<button type="submit" class="button" name="' . esc_attr(self::KEY) . '[alerts_api_key_clear]" value="1">Ta bort API-nyckel och spara ändringar</button>';
+                        echo '<p class="description">' . esc_html__('En API-nyckel är sparad.', 'arcwind-init') . '</p>';
+                        echo '<button type="submit" class="button" name="' . esc_attr(self::KEY) . '[alerts_api_key_clear]" value="1">' . esc_html__('Ta bort API-nyckel och spara ändringar', 'arcwind-init') . '</button>';
                     } else {
-                        echo '<input id="arcwind_oneuptime_alerts_api_key" class="regular-text" type="password" name="' . esc_attr($name) . '" value="" autocomplete="new-password">';
-                        echo '<p class="description">Nyckeln behöver läsbehörighet för Alert och Alert State.</p>';
+                        echo '<input id="arcwind_oneuptime_alerts_api_key" class="regular-text" type="password" name="' . esc_attr($name) . '" aria-label="' . esc_attr($definition[0]) . '" value="" autocomplete="new-password">';
+                        echo '<p class="description">' . esc_html__('Nyckeln behöver läsbehörighet för Alert och Alert State.', 'arcwind-init') . '</p>';
                     }
                     return;
                 }
                 $id = 'arcwind_oneuptime_' . $key;
-                echo '<input id="' . esc_attr($id) . '" class="regular-text" type="' . esc_attr($definition[1]) . '" name="' . esc_attr($name) . '" value="' . esc_attr($settings[$key]) . '" autocomplete="off"' . ($key === 'host' ? ' placeholder="https://oneuptime.app.arc.vin/"' : '') . '>';
-                if ($key === 'host') echo '<p class="description">Basadressen till din OneUptime-installation, med https://.</p>';
-                if ($key === 'status_page_id' && $settings['status_url']) echo '<p class="description">Statussida: <a href="' . esc_url($settings['status_url']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($settings['status_url']) . '</a></p>';
+                echo '<input id="' . esc_attr($id) . '" class="regular-text" type="' . esc_attr($definition[1]) . '" name="' . esc_attr($name) . '" aria-label="' . esc_attr($definition[0]) . '" value="' . esc_attr($settings[$key]) . '" autocomplete="off"' . ($key === 'host' ? ' placeholder="https://oneuptime.app.arc.vin/"' : '') . '>';
+                if ($key === 'host') echo '<p class="description">' . esc_html__('Basadressen till din OneUptime-installation, med https://.', 'arcwind-init') . '</p>';
+                if ($key === 'status_page_id' && $settings['status_url']) echo '<p class="description">' . esc_html__('Statussida:', 'arcwind-init') . ' <a href="' . esc_url($settings['status_url']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($settings['status_url']) . '</a></p>';
                 if ($key === 'heartbeat_secret') {
-                    echo '<p class="description">Du kan klistra in hela heartbeat-adressen; adressen kortas automatiskt till ID:t i fältet.</p>';
-                    if ($settings['heartbeat_url']) echo '<p class="description">Heartbeat-adress: <code>' . esc_html($settings['heartbeat_url']) . '</code></p>';
+                    echo '<p class="description">' . esc_html__('Du kan klistra in hela heartbeat-adressen; adressen kortas automatiskt till ID:t i fältet.', 'arcwind-init') . '</p>';
+                    if ($settings['heartbeat_url']) echo '<p class="description">' . esc_html__('Heartbeat-adress:', 'arcwind-init') . ' <code>' . esc_html($settings['heartbeat_url']) . '</code></p>';
                     echo '<script>(function(){var input=document.getElementById("arcwind_oneuptime_heartbeat_secret"),host=document.getElementById("arcwind_oneuptime_host");function normalize(){var v=input.value.trim(),h=host.value.trim().replace(/\/+$/,"");if(h&&v.indexOf(h+"/heartbeat/")===0)input.value=v.slice((h+"/heartbeat/").length).replace(/\/+$/,"")}input.addEventListener("input",normalize);host.addEventListener("input",normalize)})();</script>';
                 }
             }, 'arcwind_init_oneuptime', $definition[2]);
@@ -156,15 +156,15 @@ class ArcWind_Init_OneUptime {
             'arcwind_oneuptime_heartbeat' => empty($settings['heartbeat_enabled']) ? 'inactive' : (!empty($settings['enabled']) && $host_ready && $settings['heartbeat_secret'] !== '' ? 'active' : ($host_ready || $settings['heartbeat_secret'] !== '' ? 'error' : 'inactive')),
             'arcwind_oneuptime_alerts' => empty($settings['alerts_admin']) ? 'inactive' : ($integration_ready && $settings['alerts_api_key'] !== '' ? 'active' : ($host_ready || $settings['status_page_id'] !== '' || $settings['alerts_api_key'] !== '' ? 'error' : 'inactive')),
         ];
-        $icons = ['active' => ['yes-alt', 'Aktiv'], 'inactive' => ['minus', 'Av'], 'error' => ['warning', 'Behöver konfigureras']];
+        $icons = ['active' => ['yes-alt', __('Aktiv', 'arcwind-init')], 'inactive' => ['minus', __('Av', 'arcwind-init')], 'error' => ['warning', __('Behöver konfigureras', 'arcwind-init')]];
         $groups = [
-            'arcwind_oneuptime_connection' => ['Statussida', 'Ange OneUptime-värd och statussidans ID. Adressen skapas automatiskt.'],
-            'arcwind_oneuptime_information' => ['Driftinformation', 'Välj vilka händelser som visas på webbplatsen och i WordPress-admin.'],
-            'arcwind_oneuptime_heartbeat' => ['Heartbeat', 'En heartbeat är en återkommande signal till OneUptime. Skapa en Incoming Request-monitor och ange dess heartbeat-ID. WP-Cron skickar signalen ungefär varje minut när webbplatsen får trafik.'],
-            'arcwind_oneuptime_alerts' => ['Alerts', 'Visa olösta alerts från monitorerna på statussidan i WordPress-admin. API-nyckeln behöver läsbehörighet för Alert och Alert State.'],
+            'arcwind_oneuptime_connection' => [__('Statussida', 'arcwind-init'), __('Ange OneUptime-värd och statussidans ID. Adressen skapas automatiskt.', 'arcwind-init')],
+            'arcwind_oneuptime_information' => [__('Driftinformation', 'arcwind-init'), __('Välj vilka händelser som visas på webbplatsen och i WordPress-admin.', 'arcwind-init')],
+            'arcwind_oneuptime_heartbeat' => [__('Heartbeat', 'arcwind-init'), __('En heartbeat är en återkommande signal till OneUptime. Skapa en Incoming Request-monitor och ange dess heartbeat-ID. WP-Cron skickar signalen ungefär varje minut när webbplatsen får trafik.', 'arcwind-init')],
+            'arcwind_oneuptime_alerts' => [__('Alerts', 'arcwind-init'), __('Visa olösta alerts från monitorerna på statussidan i WordPress-admin. API-nyckeln behöver läsbehörighet för Alert och Alert State.', 'arcwind-init')],
         ];
         echo '<style>#arcwind-oneuptime-settings tbody[hidden]{display:none}#arcwind-oneuptime-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-oneuptime-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-oneuptime-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}#arcwind-oneuptime-settings .arcwind-section-status{display:inline-flex;vertical-align:middle;margin-left:8px}#arcwind-oneuptime-settings .arcwind-section-status-active{color:#008a20}#arcwind-oneuptime-settings .arcwind-section-status-inactive{color:#646970}#arcwind-oneuptime-settings .arcwind-section-status-error{color:#b26200}</style>';
-        echo '<p class="description">Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.</p>';
+        echo '<p class="description">' . esc_html__('Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.', 'arcwind-init') . '</p>';
         echo '<table class="form-table" role="presentation" id="arcwind-oneuptime-settings">';
         foreach ($groups as $section => $details) {
             $open = $section === 'arcwind_oneuptime_connection';
@@ -172,8 +172,8 @@ class ArcWind_Init_OneUptime {
                 (in_array($section, ['arcwind_oneuptime_information', 'arcwind_oneuptime_alerts'], true) && !$status_ready);
             $target = $section . '_fields';
             $state = $states[$section];
-            $status_label = 'Sparad status: ' . $icons[$state][1];
-            echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><span class="arcwind-section-status arcwind-section-status-' . esc_attr($state) . '" role="img" aria-label="' . esc_attr($status_label) . '" title="' . esc_attr($status_label) . '"><span class="dashicons dashicons-' . esc_attr($icons[$state][0]) . '" aria-hidden="true"></span></span><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($section === 'arcwind_oneuptime_information' ? ' <span id="arcwind-oneuptime-status-required"' . ($status_ready ? ' hidden' : '') . '>Fyll i värd och statussidans ID för att låsa upp valen.</span>' : '') . ($section === 'arcwind_oneuptime_heartbeat' ? ' <span id="arcwind-oneuptime-host-required"' . ($host_ready ? ' hidden' : '') . '>Fyll i OneUptime-värd för att låsa upp heartbeat.</span>' : '') . '</p></th></tr></tbody>';
+            $status_label = __('Sparad status:', 'arcwind-init') . ' ' . $icons[$state][1];
+            echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><span class="arcwind-section-status arcwind-section-status-' . esc_attr($state) . '" role="img" aria-label="' . esc_attr($status_label) . '" title="' . esc_attr($status_label) . '"><span class="dashicons dashicons-' . esc_attr($icons[$state][0]) . '" aria-hidden="true"></span></span><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($section === 'arcwind_oneuptime_information' ? ' <span id="arcwind-oneuptime-status-required"' . ($status_ready ? ' hidden' : '') . '>' . esc_html__('Fyll i värd och statussidans ID för att låsa upp valen.', 'arcwind-init') . '</span>' : '') . ($section === 'arcwind_oneuptime_heartbeat' ? ' <span id="arcwind-oneuptime-host-required"' . ($host_ready ? ' hidden' : '') . '>' . esc_html__('Fyll i OneUptime-värd för att låsa upp heartbeat.', 'arcwind-init') . '</span>' : '') . '</p></th></tr></tbody>';
             echo '<tbody id="' . esc_attr($target) . '"' . ($open ? '' : ' hidden') . '>';
             do_settings_fields('arcwind_init_oneuptime', $section);
             echo '</tbody>';
@@ -193,7 +193,7 @@ class ArcWind_Init_OneUptime {
         foreach (['incidents', 'announcements', 'maintenance'] as $type) $out['show_' . $type] = (int) ($out['public_' . $type] || $out['admin_' . $type]);
         $out['host'] = rtrim(esc_url_raw(self::api_text($raw['host'] ?? '')), '/');
         if ($out['host'] && self::host_from_url($out['host']) !== $out['host']) {
-            add_settings_error(self::KEY, 'host', 'Ange en giltig HTTPS-värd utan sökväg.', 'error');
+            add_settings_error(self::KEY, 'host', __('Ange en giltig HTTPS-värd utan sökväg.', 'arcwind-init'), 'error');
             $out['host'] = '';
         }
         $out['status_page_id'] = sanitize_text_field(self::api_text($raw['status_page_id'] ?? ''));
@@ -203,13 +203,13 @@ class ArcWind_Init_OneUptime {
         if (strpos($secret, '://') !== false) {
             $prefix = $out['host'] . '/heartbeat/';
             if (!$out['host'] || strpos($secret, $prefix) !== 0) {
-                add_settings_error(self::KEY, 'heartbeat_secret', 'Heartbeat-adressen måste höra till den angivna värden.', 'error');
+                add_settings_error(self::KEY, 'heartbeat_secret', __('Heartbeat-adressen måste höra till den angivna värden.', 'arcwind-init'), 'error');
                 $secret = '';
             } else $secret = substr($secret, strlen($prefix));
         }
         $secret = rtrim($secret, '/');
         if ($secret !== '' && !preg_match('/^[A-Za-z0-9._-]+$/', $secret)) {
-            add_settings_error(self::KEY, 'heartbeat_secret', 'Ange ett giltigt heartbeat-ID.', 'error');
+            add_settings_error(self::KEY, 'heartbeat_secret', __('Ange ett giltigt heartbeat-ID.', 'arcwind-init'), 'error');
             $secret = '';
         }
         $out['heartbeat_secret'] = $secret;
@@ -218,7 +218,7 @@ class ArcWind_Init_OneUptime {
         $existing = self::options();
         $new_key = self::api_text($raw['alerts_api_key'] ?? '');
         if ($new_key !== '' && preg_match('/[\x00-\x1f\x7f]/', $new_key)) {
-            add_settings_error(self::KEY, 'alerts_api_key', 'API-nyckeln innehåller ogiltiga tecken.', 'error');
+            add_settings_error(self::KEY, 'alerts_api_key', __('API-nyckeln innehåller ogiltiga tecken.', 'arcwind-init'), 'error');
             $new_key = '';
         }
         $out['alerts_api_key'] = !empty($raw['alerts_api_key_clear']) ? '' : ($new_key !== '' ? $new_key : $existing['alerts_api_key']);
@@ -236,7 +236,7 @@ class ArcWind_Init_OneUptime {
     }
 
     public function add_minute_interval($schedules) {
-        $schedules['arcwind_every_minute'] = ['interval' => 60, 'display' => 'Every minute'];
+        $schedules['arcwind_every_minute'] = ['interval' => 60, 'display' => __('Varje minut', 'arcwind-init')];
         return $schedules;
     }
 
@@ -267,12 +267,14 @@ class ArcWind_Init_OneUptime {
         delete_option(self::HEARTBEAT_HEALTH);
         delete_transient(self::CACHE);
         delete_transient(self::ALERT_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_LAST_GOOD);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_FAILURE);
+        if (class_exists('ArcWind_Init_OneUptime_Dashboard')) {
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_LAST_GOOD);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_FAILURE);
+        }
     }
 
     public function sync_cron() {
@@ -404,10 +406,10 @@ class ArcWind_Init_OneUptime {
     }
 
     public static function parse_api_json($body) {
-        if (!is_string($body) || trim($body) === '') return new WP_Error('empty_response', 'OneUptime skickade ett tomt svar.');
+        if (!is_string($body) || trim($body) === '') return new WP_Error('empty_response', __('OneUptime skickade ett tomt svar.', 'arcwind-init'));
         $data = json_decode($body, true);
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
-            return new WP_Error('invalid_response', 'OneUptime skickade ett oväntat svar.');
+            return new WP_Error('invalid_response', __('OneUptime skickade ett oväntat svar.', 'arcwind-init'));
         }
         return $data;
     }
@@ -424,16 +426,16 @@ class ArcWind_Init_OneUptime {
             }
         } catch (Throwable $error) {
             self::api_diagnostic($endpoint, 'request exception');
-            return new WP_Error('api_unavailable', 'OneUptime kunde inte nås.');
+            return new WP_Error('api_unavailable', __('OneUptime kunde inte nås.', 'arcwind-init'));
         }
         if (is_wp_error($response) || !is_array($response)) {
             self::api_diagnostic($endpoint, 'request failed');
-            return new WP_Error('api_unavailable', 'OneUptime kunde inte nås.');
+            return new WP_Error('api_unavailable', __('OneUptime kunde inte nås.', 'arcwind-init'));
         }
         $code = wp_remote_retrieve_response_code($response);
         if ($code !== 200) {
             self::api_diagnostic($endpoint, 'HTTP ' . (is_int($code) ? $code : 'unknown'));
-            return new WP_Error('api_error', 'OneUptime kunde inte läsas.');
+            return new WP_Error('api_error', __('OneUptime kunde inte läsas.', 'arcwind-init'));
         }
         $data = self::parse_api_json(wp_remote_retrieve_body($response));
         if (is_wp_error($data)) self::api_diagnostic($endpoint, $data->get_error_code());
@@ -665,14 +667,17 @@ class ArcWind_Init_OneUptime {
         if (!$this->options()['banner_public']) return;
         $items = $this->active_messages('public');
         if (!$items) return;
-        echo '<div id="arcwind-oneuptime-banner" role="region" aria-label="Driftinformation">';
+        echo '<div id="arcwind-oneuptime-banner" role="region" aria-label="' . esc_attr__('Driftinformation', 'arcwind-init') . '">';
         foreach ($items as $item) {
-            $labels = ['incident' => 'Driftstörning', 'announcement' => 'Information', 'maintenance' => 'Planerat underhåll'];
+            $labels = ['incident' => __('Driftstörning', 'arcwind-init'), 'announcement' => __('Information', 'arcwind-init'), 'maintenance' => __('Planerat underhåll', 'arcwind-init')];
             $id = self::api_text($item['id'] ?? null);
             $dismissible = $id !== '' || $item['type'] !== 'incident';
             $key = hash('sha256', $item['type'] . '|' . $id . '|' . $item['title']);
-            echo '<div class="arcwind-oneuptime-message ' . esc_attr($item['type']) . '" role="' . ($item['type'] === 'incident' ? 'alert' : 'status') . '" data-dismiss-key="' . esc_attr($key) . '"><strong>' . esc_html($labels[$item['type']]) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a>';
-            if ($dismissible) echo ' <button type="button" aria-label="Dölj ' . esc_attr($labels[$item['type']]) . '">Stäng</button>';
+            echo '<div class="arcwind-oneuptime-message ' . esc_attr($item['type']) . '" role="' . ($item['type'] === 'incident' ? 'alert' : 'status') . '" data-dismiss-key="' . esc_attr($key) . '"><strong>' . esc_html($labels[$item['type']]) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">' . esc_html__('Läs mer', 'arcwind-init') . '</a>';
+            if ($dismissible) {
+                // translators: %s is the type of status message, such as an incident.
+                echo ' <button type="button" aria-label="' . esc_attr(sprintf(__('Dölj %s', 'arcwind-init'), $labels[$item['type']])) . '">' . esc_html__('Stäng', 'arcwind-init') . '</button>';
+            }
             echo '</div>';
         }
         echo '</div>';
@@ -682,8 +687,9 @@ class ArcWind_Init_OneUptime {
     public function render_admin_notice() {
         if ($this->options()['banner_admin']) {
             $items = $this->active_messages('admin');
+            $labels = ['incident' => __('Driftstörning', 'arcwind-init'), 'announcement' => __('Information', 'arcwind-init'), 'maintenance' => __('Planerat underhåll', 'arcwind-init')];
             foreach ($items as $item) {
-                echo '<div class="notice notice-info inline"><p><strong>' . esc_html(ucfirst($item['type'])) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
+                echo '<div class="notice notice-info inline"><p><strong>' . esc_html($labels[$item['type']]) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">' . esc_html__('Läs mer', 'arcwind-init') . '</a></p></div>';
             }
         }
         // Page identity only determines where the notice is rendered.
@@ -695,12 +701,12 @@ class ArcWind_Init_OneUptime {
         if (!current_user_can('manage_options')) return;
         $alerts = self::active_alerts();
         if ($alerts) {
-            echo '<div class="notice notice-warning inline arcwind-oneuptime-alerts"><p><strong>Aktiva alerts för statussidan</strong></p><ul style="list-style:none;padding-left:0">';
+            echo '<div class="notice notice-warning inline arcwind-oneuptime-alerts"><p><strong>' . esc_html__('Aktiva alerts för statussidan', 'arcwind-init') . '</strong></p><ul style="list-style:none;padding-left:0">';
             foreach ($alerts as $alert) {
                 echo '<li><details style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">' . esc_html($alert['title']);
                 if ($alert['state'] !== '') echo ' <span class="description" style="font-weight:normal">(' . esc_html($alert['state']) . ')</span>';
                 $description = $alert['description'] ?? '';
-                echo '</summary><p style="white-space:pre-wrap;margin:8px 0 4px 18px">' . ($description !== '' ? esc_html($description) : 'Ingen beskrivning finns.') . '</p></details></li>';
+                echo '</summary><p style="white-space:pre-wrap;margin:8px 0 4px 18px">' . ($description !== '' ? esc_html($description) : esc_html__('Ingen beskrivning finns.', 'arcwind-init')) . '</p></details></li>';
             }
             echo '</ul></div>';
         }

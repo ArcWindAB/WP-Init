@@ -76,27 +76,27 @@ class ArcWind_Init_GitHub_Updater {
         $info->download_link = !empty($release['package']) ? $release['package'] : '';
         $changelog = !empty($release['changelog'])
             ? '<p>' . wp_kses_post($release['changelog']) . '</p>'
-            : '<p>Versionsnyheter finns under <a href="https://github.com/' . self::GITHUB_REPO . '/releases">GitHub Releases</a>.</p>';
+            : '<p>' . esc_html__('Versionsnyheter finns under', 'arcwind-init') . ' <a href="https://github.com/' . self::GITHUB_REPO . '/releases">GitHub Releases</a>.</p>';
         $info->sections      = [
-            'description' => '<p>ArcWind Init samlar PostHog, feedback och OneUptime i WordPress. Varje del kan konfigureras separat under <strong>Inställningar → ArcWind Init</strong>.</p>' .
+            'description' => '<p>' . wp_kses_post(__('ArcWind Init samlar PostHog, feedback och OneUptime i WordPress. Varje del kan konfigureras separat under <strong>Inställningar → ArcWind Init</strong>.', 'arcwind-init')) . '</p>' .
                 '<ul>' .
-                '<li><strong>PostHog:</strong> Spåra sidvisningar och händelser på webbplatsen och i admin. Välj EU/US och eventuell reverse proxy. En separat statistikwidget visar aktiva användare och sidvisningar för de senaste sju dagarna när projekt-ID och personlig API-nyckel finns.</li>' .
-                '<li><strong>Feedback:</strong> Visa en länk till ert feedbackformulär på WordPress dashboard när ett feedback-UUID har angetts.</li>' .
-                '<li><strong>OneUptime / Driftstatus:</strong> Visa incidenter, meddelanden och planerade underhåll på webbplatsen eller i admin. Statuswidgeten visar statussidans namn och drifttid för de senaste sju dagarna. Valfria alerts visas i admin för monitorerna på statussidan; heartbeat skickas via WP-Cron till en Incoming Request-monitor.</li>' .
+                '<li>' . wp_kses_post(__('<strong>PostHog:</strong> Spåra sidvisningar och händelser på webbplatsen och i admin. Välj EU/US och eventuell proxy. En separat statistikwidget visar aktiva användare och sidvisningar för de senaste sju dagarna när projekt-ID och personlig API-nyckel finns.', 'arcwind-init')) . '</li>' .
+                '<li>' . wp_kses_post(__('<strong>Feedback:</strong> Visa en länk till ert feedbackformulär på WordPress dashboard när ett feedback-UUID har angetts.', 'arcwind-init')) . '</li>' .
+                '<li>' . wp_kses_post(__('<strong>OneUptime / Driftstatus:</strong> Visa incidenter, meddelanden och planerade underhåll på webbplatsen eller i admin. Statuswidgeten visar statussidans namn och drifttid för de senaste sju dagarna. Valfria alerts visas i admin för monitorerna på statussidan; heartbeat skickas via WP-Cron till en Incoming Request-monitor.', 'arcwind-init')) . '</li>' .
                 '</ul>' .
-                '<p>Statistik-, feedback- och statuskort visas först när respektive underlag är konfigurerat. Alerts kräver en OneUptime API-nyckel och visas bara för administratörer.</p>',
+                '<p>' . esc_html__('Statistik-, feedback- och statuskort visas först när respektive underlag är konfigurerat. Alerts kräver en OneUptime API-nyckel och visas bara för administratörer.', 'arcwind-init') . '</p>',
             'installation' => '<ol>' .
-                '<li>Installera ZIP-filen <code>arcwind-init.zip</code> från en GitHub Release och aktivera tillägget.</li>' .
-                '<li>Öppna <strong>Inställningar → ArcWind Init</strong>. Fyll i bara de integrationer du vill använda.</li>' .
-                '<li>För PostHog: ange projekt-token för spårning. Lägg till projekt-ID och personlig API-nyckel om du vill visa dashboardstatistik.</li>' .
-                '<li>För OneUptime: ange värd och statussidans ID. Skapa en Incoming Request-monitor om du vill skicka heartbeat.</li>' .
-                '<li>Kontrollera status och testa anslutningarna på fliken <strong>Diagnostik</strong>.</li>' .
-                '</ol><p>Tillägget söker uppdateringar bland publicerade GitHub Releases. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.</p>',
-            'faq' => '<h3>Behöver jag konfigurera alla tre delar?</h3><p>Nej. Statistik- och feedbackkort visas när deras egna uppgifter finns; OneUptimes statuskort kräver värd och status-ID.</p>' .
-                '<h3>Vilken PostHog-adress används?</h3><p><code>api_host</code> används för webbspårning och serverhändelser. <code>ui_host</code>, eller vald regions PostHog-adress, används för privata statistikfrågor.</p>' .
-                '<h3>Behöver OneUptime en API-nyckel?</h3><p>Den publika statussidan och heartbeat kräver ingen API-nyckel. Adminvisning av alerts kräver en nyckel med läsbehörighet för Alert och Alert State.</p>' .
-                '<h3>Vad händer om en extern tjänst är nere?</h3><p>WordPress kan fortfarande laddas. Statuskortet kan visa senast kända data med märkningen ”ej aktuell”, och statistiken kan visa tomma värden.</p>' .
-                '<h3>Var finns mer dokumentation?</h3><p>Se <a href="https://github.com/' . self::GITHUB_REPO . '#readme">projektets README på GitHub</a>.</p>',
+                '<li>' . wp_kses_post(__('Installera ZIP-filen <code>arcwind-init.zip</code> från en GitHub Release och aktivera tillägget.', 'arcwind-init')) . '</li>' .
+                '<li>' . wp_kses_post(__('Öppna <strong>Inställningar → ArcWind Init</strong>. Fyll i bara de integrationer du vill använda.', 'arcwind-init')) . '</li>' .
+                '<li>' . esc_html__('För PostHog: ange projekt-token för spårning. Lägg till projekt-ID och personlig API-nyckel om du vill visa dashboardstatistik.', 'arcwind-init') . '</li>' .
+                '<li>' . esc_html__('För OneUptime: ange värd och statussidans ID. Skapa en Incoming Request-monitor om du vill skicka heartbeat.', 'arcwind-init') . '</li>' .
+                '<li>' . wp_kses_post(__('Kontrollera status och testa anslutningarna på fliken <strong>Diagnostik</strong>.', 'arcwind-init')) . '</li>' .
+                '</ol><p>' . esc_html__('Tillägget söker uppdateringar bland publicerade GitHub Releases. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.', 'arcwind-init') . '</p>',
+            'faq' => '<h3>' . esc_html__('Behöver jag konfigurera alla tre delar?', 'arcwind-init') . '</h3><p>' . esc_html__('Nej. Statistik- och feedbackkort visas när deras egna uppgifter finns; OneUptimes statuskort kräver värd och status-ID.', 'arcwind-init') . '</p>' .
+                '<h3>' . esc_html__('Vilken PostHog-adress används?', 'arcwind-init') . '</h3><p>' . wp_kses_post(__('<code>api_host</code> används för webbspårning och serverhändelser. <code>ui_host</code>, eller vald regions PostHog-adress, används för privata statistikfrågor.', 'arcwind-init')) . '</p>' .
+                '<h3>' . esc_html__('Behöver OneUptime en API-nyckel?', 'arcwind-init') . '</h3><p>' . esc_html__('Den publika statussidan och heartbeat kräver ingen API-nyckel. Adminvisning av alerts kräver en nyckel med läsbehörighet för Alert och Alert State.', 'arcwind-init') . '</p>' .
+                '<h3>' . esc_html__('Vad händer om en extern tjänst är nere?', 'arcwind-init') . '</h3><p>' . esc_html__('WordPress kan fortfarande laddas. Statuskortet kan visa senast kända data med märkningen ”ej aktuell”, och statistiken kan visa tomma värden.', 'arcwind-init') . '</p>' .
+                '<h3>' . esc_html__('Var finns mer dokumentation?', 'arcwind-init') . '</h3><p>' . esc_html__('Se', 'arcwind-init') . ' <a href="https://github.com/' . self::GITHUB_REPO . '#readme">' . esc_html__('projektets README på GitHub', 'arcwind-init') . '</a>.</p>',
             'changelog' => $changelog,
         ];
 
@@ -109,18 +109,18 @@ class ArcWind_Init_GitHub_Updater {
         }
 
         if (!is_string($source) || !is_file(trailingslashit($source) . 'arcwind-init.php')) {
-            return new WP_Error('invalid_package', 'Uppdateringspaketet saknar pluginfilen.');
+            return new WP_Error('invalid_package', __('Uppdateringspaketet saknar pluginfilen.', 'arcwind-init'));
         }
         $header = get_file_data(trailingslashit($source) . 'arcwind-init.php', ['Version' => 'Version'], 'plugin');
         if (empty($header['Version']) || !preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $header['Version'])) {
-            return new WP_Error('invalid_package', 'Uppdateringspaketet har ogiltig version.');
+            return new WP_Error('invalid_package', __('Uppdateringspaketet har ogiltig version.', 'arcwind-init'));
         }
         // A manual ZIP install may intentionally restore an older version. Match the
         // cached release only for WordPress update jobs, never for manual recovery.
         $release = get_transient(self::CACHE_KEY);
         if (($hook_extra['action'] ?? '') === 'update' && is_array($release) &&
             !empty($release['version']) && $header['Version'] !== $release['version']) {
-            return new WP_Error('invalid_package', 'Uppdateringspaketets version stämmer inte med releasen.');
+            return new WP_Error('invalid_package', __('Uppdateringspaketets version stämmer inte med releasen.', 'arcwind-init'));
         }
         // Keep the package in WordPress's upgrade working directory. Core must
         // back up and replace the installed plugin itself for rollback to work.
@@ -132,18 +132,18 @@ class ArcWind_Init_GitHub_Updater {
 
         global $wp_filesystem;
         if (!$wp_filesystem) {
-            return new WP_Error('filesystem_unavailable', 'WordPress filsystem är inte tillgängligt.');
+            return new WP_Error('filesystem_unavailable', __('WordPress filsystem är inte tillgängligt.', 'arcwind-init'));
         }
 
         if ($wp_filesystem->exists($desired)) {
-            return new WP_Error('invalid_package', 'Uppdateringens arbetskatalog är redan upptagen.');
+            return new WP_Error('invalid_package', __('Uppdateringens arbetskatalog är redan upptagen.', 'arcwind-init'));
         }
 
         if ($wp_filesystem->move($source, $desired, false)) {
             return $desired;
         }
 
-        return new WP_Error('invalid_package', 'Uppdateringspaketet kunde inte installeras.');
+        return new WP_Error('invalid_package', __('Uppdateringspaketet kunde inte installeras.', 'arcwind-init'));
     }
 
     private function get_latest_release() {

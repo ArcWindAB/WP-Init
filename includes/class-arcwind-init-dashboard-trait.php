@@ -37,9 +37,9 @@ trait ArcWind_Init_Dashboard_Trait {
         if (empty($opts['personal_api_key'])) $missing[] = 'Personal API Key';
 
         if (!empty($missing)) {
-            echo '<p><strong>PostHog är inte konfigurerat.</strong></p>';
-            echo '<p>Saknas: ' . esc_html(implode(', ', $missing)) . '</p>';
-            echo '<p><a href="' . esc_url(admin_url('options-general.php?page=arcwind_init')) . '">Gå till inställningar</a></p>';
+            echo '<p><strong>' . esc_html__('PostHog är inte konfigurerat.', 'arcwind-init') . '</strong></p>';
+            echo '<p>' . esc_html__('Saknas:', 'arcwind-init') . ' ' . esc_html(implode(', ', $missing)) . '</p>';
+            echo '<p><a href="' . esc_url(admin_url('options-general.php?page=arcwind_init')) . '">' . esc_html__('Gå till inställningar', 'arcwind-init') . '</a></p>';
             return;
         }
 
@@ -52,15 +52,15 @@ trait ArcWind_Init_Dashboard_Trait {
                 wp_schedule_single_event(time(), 'arcwind_init_refresh_posthog_stats');
                 if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
             }
-            $data = ['active_7d' => null, 'pageviews_7d' => null, 'fetched_at' => 'väntar på hämtning'];
+            $data = ['active_7d' => null, 'pageviews_7d' => null, 'fetched_at' => __('väntar på hämtning', 'arcwind-init')];
         }
 
         echo '<div class="arcwind-grid">';
-        $this->render_stat_card('Aktiva användare (7 dagar)', $this->format_num($data['active_7d']));
-        $this->render_stat_card('Sidvisningar (7 dagar)', $this->format_num($data['pageviews_7d']));
+        $this->render_stat_card(__('Aktiva användare (7 dagar)', 'arcwind-init'), $this->format_num($data['active_7d']));
+        $this->render_stat_card(__('Sidvisningar (7 dagar)', 'arcwind-init'), $this->format_num($data['pageviews_7d']));
         echo '</div>';
 
-        echo '<p class="arcwind-subtle">Uppdaterad: ' . esc_html(is_string($data['fetched_at'] ?? null) ? $data['fetched_at'] : 'okänd') . '. Cache: 10 min.</p>';
+        echo '<p class="arcwind-subtle">' . esc_html__('Uppdaterad:', 'arcwind-init') . ' ' . esc_html(is_string($data['fetched_at'] ?? null) ? $data['fetched_at'] : __('okänd', 'arcwind-init')) . '. ' . esc_html__('Cache: 10 min.', 'arcwind-init') . '</p>';
     }
 
     public function refresh_posthog_stats() {
@@ -102,7 +102,7 @@ trait ArcWind_Init_Dashboard_Trait {
     private function fetch_scalar($hogql, &$errors) {
         $res = $this->query_posthog($hogql, $errors);
         if (!$res || empty($res['results']) || !is_array($res['results'])) {
-            $errors[] = 'Scalar query returned no results.';
+            $errors[] = __('Statistikfrågan gav inget resultat.', 'arcwind-init');
             return null;
         }
         $first = $res['results'][0] ?? null;
@@ -122,7 +122,7 @@ trait ArcWind_Init_Dashboard_Trait {
         $api_key    = is_string($opts['personal_api_key'] ?? null) ? $opts['personal_api_key'] : '';
 
         if (empty($host) || empty($project_id) || empty($api_key) || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {
-            $errors[] = 'Saknad konfiguration.';
+            $errors[] = __('Saknad konfiguration.', 'arcwind-init');
             return null;
         }
 
@@ -155,7 +155,7 @@ trait ArcWind_Init_Dashboard_Trait {
         }
 
         if (is_wp_error($resp) || !is_array($resp)) {
-            $msg = 'PostHog kunde inte nås.';
+            $msg = __('PostHog kunde inte nås.', 'arcwind-init');
             $errors[] = $msg;
             $this->capture_error('http_error', $msg);
             return null;
@@ -165,7 +165,7 @@ trait ArcWind_Init_Dashboard_Trait {
         $raw  = wp_remote_retrieve_body($resp);
 
         if (!is_int($code) || $code < 200 || $code >= 300) {
-            $msg = 'PostHog svarade med HTTP-fel.';
+            $msg = __('PostHog svarade med HTTP-fel.', 'arcwind-init');
             $errors[] = $msg;
             $this->capture_error('api_error', $msg, ['status' => is_int($code) ? $code : 0]);
             return null;
@@ -173,7 +173,7 @@ trait ArcWind_Init_Dashboard_Trait {
 
         $json = is_string($raw) ? json_decode($raw, true) : null;
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($json)) {
-            $msg = 'Ogiltig JSON från API.';
+            $msg = __('Ogiltig JSON från API.', 'arcwind-init');
             $errors[] = $msg;
             $this->capture_error('json_error', $msg);
             return null;
@@ -183,7 +183,7 @@ trait ArcWind_Init_Dashboard_Trait {
             if (isset($json['result'])) {
                 $json['results'] = $json['result'];
             } else {
-                $msg = 'Oväntat API-format.';
+                $msg = __('Oväntat API-format.', 'arcwind-init');
                 $errors[] = $msg;
                 $this->capture_error('shape_error', $msg);
                 return null;
@@ -191,8 +191,9 @@ trait ArcWind_Init_Dashboard_Trait {
         }
 
         if (!is_array($json['results'])) {
-            $errors[] = 'Oväntat API-format.';
-            $this->capture_error('shape_error', 'Oväntat API-format.');
+            $msg = __('Oväntat API-format.', 'arcwind-init');
+            $errors[] = $msg;
+            $this->capture_error('shape_error', $msg);
             return null;
         }
 

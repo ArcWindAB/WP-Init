@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.0.1
+
+- Align PostHog settings with the regional API host fallback: a project token unlocks web and error tracking when the custom API host is empty.
+- Add accessible names and translation hooks to integration controls and status messages, and keep OneUptime uninstall safe when its dashboard module is missing.
 - Fetch PostHog dashboard data and OneUptime banners, status, and alerts in background WordPress Cron jobs so external failures do not delay page rendering.
 - Place the public status banner above the WordPress toolbar on desktop and mobile. Keep dismissals for at most 24 hours and show changed incidents again.
 - Fix the PostHog tracking bridge URL on frontend and admin pages. Disable WordPress navigation transitions on the ArcWind settings page to avoid an aborted browser transition.

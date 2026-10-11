@@ -28,7 +28,7 @@ class ArcWind_Init_OneUptime_Dashboard {
     public function register_widget() {
         $o = $this->options();
         if (!$o['enabled'] || !$o['status_page_id'] || !$o['status_url']) return;
-        $title = 'Driftstatus';
+        $title = __('Driftstatus', 'arcwind-init');
         if ($o['status_url'] && $o['status_page_id']) {
             $result = $this->overview($o);
             if (!is_wp_error($result) && isset($result['data']) && is_array($result['data'])) {
@@ -86,7 +86,7 @@ class ArcWind_Init_OneUptime_Dashboard {
             $last_good['stale'] = true;
             return $last_good;
         }
-        return new WP_Error('api_unavailable', 'OneUptime är tillfälligt otillgängligt.');
+        return new WP_Error('api_unavailable', __('OneUptime är tillfälligt otillgängligt.', 'arcwind-init'));
     }
 
     private function history($options) {
@@ -123,7 +123,8 @@ class ArcWind_Init_OneUptime_Dashboard {
         set_transient(self::HISTORY_LAST_GOOD, $result, DAY_IN_SECONDS);
     }
 
-    private function label($value, $fallback = 'Okänd') {
+    private function label($value, $fallback = null) {
+        if ($fallback === null) $fallback = __('Okänd', 'arcwind-init');
         if (is_string($value) && $value !== '') return $value;
         if (!is_array($value)) return $fallback;
         foreach (['name', 'displayName', 'title'] as $key) {
@@ -133,19 +134,19 @@ class ArcWind_Init_OneUptime_Dashboard {
     }
 
     private function status($value) {
-        if (!is_array($value)) return ['name' => 'Okänd status', 'color' => '#757575'];
+        if (!is_array($value)) return ['name' => __('Okänd status', 'arcwind-init'), 'color' => '#757575'];
         $color = $value['color']['value'] ?? $value['color'] ?? '';
         if (!is_string($color) || !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
             $color = !empty($value['isOperationalState']) ? '#237a45' : '#946200';
         }
-        return ['name' => $this->label($value, 'Okänd status'), 'color' => $color];
+        return ['name' => $this->label($value, __('Okänd status', 'arcwind-init')), 'color' => $color];
     }
 
     private function colored_status($value, $stale = false) {
         $status = $this->status($value);
         if ($stale) {
             $status['color'] = '#757575';
-            $status['name'] .= ' (ej aktuell)';
+            $status['name'] .= ' (' . __('ej aktuell', 'arcwind-init') . ')';
         }
         echo '<span style="display:inline-flex;align-items:center;gap:6px">';
         echo '<span aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:' . esc_attr($status['color']) . ';display:inline-block"></span>';
@@ -198,10 +199,10 @@ class ArcWind_Init_OneUptime_Dashboard {
         $wrapped = is_array($payload) ? ['_arcwindUptime' => $payload] : [];
         $record = $is_group ? $this->group_uptime_record($this->normalize_id($entity['_id'] ?? $entity['id'] ?? ''), $wrapped) : $this->uptime_record($entity, $wrapped);
         $value = is_array($record) ? ($record['uptimePercent'] ?? null) : null;
-        echo '<small style="display:block;color:#646970">Senaste 7 dagarna: ';
+        echo '<small style="display:block;color:#646970">' . esc_html__('Senaste 7 dagarna:', 'arcwind-init') . ' ';
         if (is_scalar($value) && is_numeric($value) && is_finite((float) $value) && (float) $value >= 0 && (float) $value <= 100) {
-            echo esc_html(number_format_i18n((float) $value, 2)) . '% drifttid';
-        } else echo 'uppgift saknas';
+            echo esc_html(number_format_i18n((float) $value, 2)) . '% ' . esc_html__('drifttid', 'arcwind-init');
+        } else echo esc_html__('uppgift saknas', 'arcwind-init');
         echo '</small>';
     }
 
@@ -229,9 +230,9 @@ class ArcWind_Init_OneUptime_Dashboard {
     private function render_resources($data, $stale = false) {
         $resources = ArcWind_Init_OneUptime::api_records($data, 'statusPageResources');
         $groups = ArcWind_Init_OneUptime::api_records($data, 'resourceGroups');
-        echo '<details open style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">Komponenter och tjänster</summary>';
+        echo '<details open style="border-top:1px solid #dcdcde;padding:8px 0"><summary style="cursor:pointer;font-weight:600">' . esc_html__('Komponenter och tjänster', 'arcwind-init') . '</summary>';
         if (!$resources && !$groups) {
-            echo '<p style="margin:8px 0 0 18px">Inga komponenter publicerade.</p></details>';
+            echo '<p style="margin:8px 0 0 18px">' . esc_html__('Inga komponenter publicerade.', 'arcwind-init') . '</p></details>';
             return;
         }
         $by_group = [];
@@ -273,7 +274,7 @@ class ArcWind_Init_OneUptime_Dashboard {
         if (isset($visited[$id]) || $depth > 20) return;
         $visited[$id] = true;
         $group = $group_map[$id];
-        echo '<details style="margin:6px 0 6px 16px;border-left:2px solid #dcdcde;padding-left:8px"><summary style="cursor:pointer;font-weight:600">' . esc_html($this->label($group, 'Grupp'));
+        echo '<details style="margin:6px 0 6px 16px;border-left:2px solid #dcdcde;padding-left:8px"><summary style="cursor:pointer;font-weight:600">' . esc_html($this->label($group, __('Grupp', 'arcwind-init')));
         $uptime = $this->group_uptime_record($id, $data);
         if ($uptime && isset($uptime['currentStatus']) && is_array($uptime['currentStatus'])) {
             echo ' – ';
@@ -307,29 +308,29 @@ class ArcWind_Init_OneUptime_Dashboard {
     public function render() {
         $o = $this->options();
         if (!$o['status_url'] || !$o['status_page_id']) {
-            echo '<p>Konfigurera statussidans URL och ID under <a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=oneuptime')) . '">statusinställningarna</a>.</p>';
+            echo '<p>' . esc_html__('Konfigurera statussidans adress och ID under', 'arcwind-init') . ' <a href="' . esc_url(admin_url('options-general.php?page=arcwind_init&tab=oneuptime')) . '">' . esc_html__('statusinställningarna', 'arcwind-init') . '</a>.</p>';
             return;
         }
         $result = $this->overview($o);
         if (is_wp_error($result)) {
-            echo '<p role="alert">Statusdata är tillfälligt otillgängliga.</p>';
+            echo '<p role="alert">' . esc_html__('Statusdata är tillfälligt otillgängliga.', 'arcwind-init') . '</p>';
             return;
         }
         $data = $result['data'];
         $stale = !empty($result['stale']);
         $this->history_data = $this->history($o);
-        if ($stale) echo '<p role="status">Statussidan kan inte nås. Senast kända data från ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' visas nedan; statusen är inte aktuell.</p>';
-        if ($this->history_data === null) echo '<p>Historisk drifttid hämtas i bakgrunden.</p>';
-        elseif (!empty($this->history_data['stale'])) echo '<p>Historisk drifttid är från en tidigare hämtning.</p>';
-        echo '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px"><strong>' . ($stale ? 'Senast kända status' : 'Aktuell status') . '</strong>';
+        if ($stale) echo '<p role="status">' . esc_html__('Statussidan kan inte nås. Senast kända data från', 'arcwind-init') . ' ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' ' . esc_html__('visas nedan; statusen är inte aktuell.', 'arcwind-init') . '</p>';
+        if ($this->history_data === null) echo '<p>' . esc_html__('Historisk drifttid hämtas i bakgrunden.', 'arcwind-init') . '</p>';
+        elseif (!empty($this->history_data['stale'])) echo '<p>' . esc_html__('Historisk drifttid är från en tidigare hämtning.', 'arcwind-init') . '</p>';
+        echo '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px"><strong>' . esc_html($stale ? __('Senast kända status', 'arcwind-init') : __('Aktuell status', 'arcwind-init')) . '</strong>';
         if (!empty($data['overallStatus'])) $this->colored_status($data['overallStatus'], $stale);
-        else echo 'Ingen status tillgänglig';
+        else echo esc_html__('Ingen status tillgänglig', 'arcwind-init');
         echo '</div>';
         $this->render_resources($data, $stale);
-        $this->records($data, 'activeIncidents', 'Aktiva incidenter');
-        $this->records($data, 'activeEpisodes', 'Aktiva episoder');
-        $this->records($data, 'scheduledMaintenanceEvents', 'Planerade underhåll');
-        $this->records($data, 'activeAnnouncements', 'Meddelanden');
-        echo '<p style="margin:12px 0 0;color:#646970;font-size:12px">Uppdaterad ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' · <a target="_blank" rel="noopener noreferrer" href="' . esc_url($o['status_url']) . '">Öppna statussidan ↗</a></p>';
+        $this->records($data, 'activeIncidents', __('Aktiva incidenter', 'arcwind-init'));
+        $this->records($data, 'activeEpisodes', __('Aktiva episoder', 'arcwind-init'));
+        $this->records($data, 'scheduledMaintenanceEvents', __('Planerade underhåll', 'arcwind-init'));
+        $this->records($data, 'activeAnnouncements', __('Meddelanden', 'arcwind-init'));
+        echo '<p style="margin:12px 0 0;color:#646970;font-size:12px">' . esc_html__('Uppdaterad', 'arcwind-init') . ' ' . esc_html(wp_date('Y-m-d H:i', $result['fetched_at'])) . ' · <a target="_blank" rel="noopener noreferrer" href="' . esc_url($o['status_url']) . '">' . esc_html__('Öppna statussidan ↗', 'arcwind-init') . '</a></p>';
     }
 }

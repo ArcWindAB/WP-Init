@@ -10,7 +10,10 @@ function wp_parse_args($args, $defaults) { return array_merge($defaults, $args);
 function wp_parse_url($url, $component = -1) { return parse_url($url, $component); }
 function esc_url_raw($url) { return $url; }
 function esc_attr($value) { return htmlspecialchars($value, ENT_QUOTES); }
+function esc_attr__($value) { return esc_attr($value); }
 function esc_html($value) { return esc_attr($value); }
+function esc_html__($value) { return esc_html($value); }
+function wp_kses_post($value) { return $value; }
 function sanitize_text_field($value) { return trim($value); }
 function wp_json_encode($value) { return json_encode($value); }
 function current_action() { return 'wp_head'; }
@@ -53,6 +56,7 @@ ob_start();
 $plugin->render_input_personal_api_key();
 $new_key_field = ob_get_clean();
 check(strpos($new_key_field, 'name="arcwind_init_settings[personal_api_key]"') !== false, 'Personal API key input was missing before a key was saved');
+check(strpos($new_key_field, 'aria-label="Personlig API-nyckel"') !== false, 'Personal API key field has no accessible name');
 
 $stored[ArcWind_Init_Options_Test::OPTION_KEY] = $plugin->sanitize_settings([
     'host' => 'https://eu.posthog.com', 'project_id' => '123',
@@ -78,6 +82,9 @@ ob_start();
 $posthog_table->invoke($plugin);
 $configured_table = ob_get_clean();
 check(substr_count($configured_table, '<table') === 1 && strpos($configured_table, 'aria-controls="arcwind_init_connection_fields" aria-expanded="true"') !== false, 'PostHog connection was not open in one settings table');
+foreach (['PostHog API-värd eller proxy', 'PostHog UI-värd', 'Projekt-ID', 'Projekt-token', 'SDK defaults'] as $label) {
+    check(strpos($configured_table, 'aria-label="' . $label . '"') !== false, 'PostHog field has no accessible name: ' . $label);
+}
 foreach (['arcwind_init_frontend_fields', 'arcwind_init_main_fields', 'arcwind_init_errors_fields'] as $section) {
     check(strpos($configured_table, 'aria-controls="' . $section . '" aria-expanded="false"><span') !== false, 'Configured PostHog section remained locked: ' . $section);
 }
@@ -95,7 +102,7 @@ foreach (['defaults', 'person_profiles', 'load_position'] as $field) {
 }
 check(strpos($configured_table, 'arcwind_init_advanced_fields') === false, 'Empty SDK section was still rendered');
 check(strpos($configured_table, 'arcwind_init_settings[host]') === false, 'Separate server host was still shown');
-check(strpos($configured_table, '<select name="arcwind_init_settings[defaults]">') !== false && strpos($configured_table, 'value="2026-05-30" selected') !== false, 'Saved SDK defaults were not selected in the dropdown');
+check(strpos($configured_table, '<select name="arcwind_init_settings[defaults]" aria-label="SDK defaults">') !== false && strpos($configured_table, 'value="2026-05-30" selected') !== false, 'Saved SDK defaults were not selected in the dropdown');
 $query = new ReflectionMethod(ArcWind_Init_Options_Test::class, 'query_posthog');
 $errors = [];
 $query->invokeArgs($plugin, ['SELECT 1', &$errors]);
@@ -125,10 +132,11 @@ check($plugin->sanitize_settings(['defaults' => '2026-04-01'])['defaults'] === '
 ob_start();
 $posthog_table->invoke($plugin);
 $no_api_table = ob_get_clean();
-check(strpos($no_api_table, 'aria-controls="arcwind_init_frontend_fields" aria-expanded="false" disabled') !== false, 'Web tracking was not locked without API host');
+check(strpos($no_api_table, 'aria-controls="arcwind_init_frontend_fields" aria-expanded="false"><span') !== false, 'Regional API host fallback did not unlock web tracking');
 check(strpos($no_api_table, 'aria-controls="arcwind_init_main_fields" aria-expanded="false"><span') !== false, 'Dashboard statistics incorrectly required API host');
-check(strpos($no_api_table, 'aria-controls="arcwind_init_errors_fields" aria-expanded="false" disabled') !== false, 'Error tracking was not locked without API host');
-check_section_state($no_api_table, 'arcwind_init_frontend_fields', 'error');
+check(strpos($no_api_table, 'aria-controls="arcwind_init_errors_fields" aria-expanded="false"><span') !== false, 'Regional API host fallback did not unlock error tracking');
+check_section_state($no_api_table, 'arcwind_init_frontend_fields', 'active');
+check(strpos($no_api_table, 'api.addEventListener("input",gate)') === false && substr_count($no_api_table, 'return !!token.value.trim()') === 2, 'Live form still depends on an explicit API host');
 $stored[ArcWind_Init_Options_Test::OPTION_KEY]['api_host'] = 'https://events.example.com';
 $stored[ArcWind_Init_Options_Test::OPTION_KEY]['public_api_key'] = '';
 ob_start();

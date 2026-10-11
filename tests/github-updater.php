@@ -19,6 +19,8 @@ function wp_remote_retrieve_response_code($value) { return $value['code']; }
 function wp_remote_retrieve_body($value) { return $value['body']; }
 function wp_parse_url($value, $component = -1) { return parse_url($value, $component); }
 function esc_html($value) { return htmlspecialchars($value, ENT_QUOTES); }
+function __($value) { return $value; }
+function esc_html__($value) { return esc_html($value); }
 function wp_kses_post($value) { return $value; }
 function trailingslashit($value) { return rtrim($value, '/') . '/'; }
 function wp_normalize_path($value) { return str_replace('\\', '/', $value); }

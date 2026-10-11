@@ -45,7 +45,9 @@ function add_settings_section() {}
 function add_settings_field($id, $title, $callback) { global $fields; $fields[$id] = $callback; }
 function do_settings_fields($page, $section) { global $fields; foreach ($fields as $callback) { echo '<tr><td>'; $callback(); echo '</td></tr>'; } }
 function esc_attr($value) { return htmlspecialchars($value, ENT_QUOTES); }
+function __($value) { return $value; }
 function esc_html($value) { return esc_attr($value); }
+function esc_html__($value) { return esc_html($value); }
 function esc_url($value) { return esc_attr($value); }
 function checked($checked, $current = true, $echo = false) { return $checked === $current ? 'checked' : ''; }
 function wp_clear_scheduled_hook($hook) { global $scheduled; $scheduled = []; }
@@ -77,12 +79,14 @@ ob_start();
 $fields['arcwind_oneuptime_alerts_api_key']();
 $empty_key_html = ob_get_clean();
 check(strpos($empty_key_html, 'name="arcwind_init_oneuptime[alerts_api_key]"') !== false && strpos($empty_key_html, 'type="password"') !== false, 'Alert API key field was not shown when no key was saved');
+check(strpos($empty_key_html, 'aria-label="API-nyckel för alerts"') !== false, 'Alert API key field has no accessible name');
 check(strpos($empty_key_html, 'alerts_api_key_clear') === false, 'Remove button appeared when no alert API key was saved');
 $saved['alerts_api_key'] = 'private-alert-key';
 ob_start();
 $fields['arcwind_oneuptime_heartbeat_secret']();
 $html = ob_get_clean();
 check(strpos($html, 'secret-token') !== false && strpos($html, 'kortas automatiskt till ID:t') !== false, 'Heartbeat ID was not shown in new field');
+check(strpos($html, 'aria-label="Heartbeat-ID"') !== false, 'Heartbeat ID field has no accessible name');
 $input = ['host' => 'https://monitor.example.test/', 'status_page_id' => 'page-1',
     'heartbeat_enabled' => 1, 'heartbeat_secret' => 'https://monitor.example.test/heartbeat/new-token/'];
 $parsed = $integration->sanitize($input);
