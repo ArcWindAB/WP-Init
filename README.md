@@ -94,7 +94,7 @@ Fliken **Diagnostik** visar aktiverings- och konfigurationsstatus för integrati
 
 ## Uppdateringar från GitHub Releases
 
-Pluginfilen har `Update URI: https://github.com/ArcWindAB/WP-Init`. Uppdateraren använder WordPress standardfilter för tillägg med egen Update URI. Den godtar endast en publicerad, stabil semantisk version med release-asset `arcwind-init.zip` på rätt GitHub-repo och via HTTPS. API-fel och rate limits cachelagras i 15 minuter. Den aktiverar inte automatiska uppdateringar åt dig: använd WordPress egen **Aktivera automatiska uppdateringar** på sidan Installerade tillägg, om er globala policy tillåter det.
+Pluginfilen har `Update URI: https://github.com/ArcWindAB/WP-Init`. Uppdateraren använder WordPress standardfilter för tillägg med egen Update URI. Informationsrutan för tillägget visar funktioner, installation, vanliga frågor och publicerade versionsnyheter; grundinformationen finns kvar även när GitHub inte svarar. Uppdateraren godtar endast en publicerad, stabil semantisk version med release-asset `arcwind-init.zip` på rätt GitHub-repo och via HTTPS. API-fel och rate limits cachelagras i 15 minuter. Den aktiverar inte automatiska uppdateringar åt dig: använd WordPress egen **Aktivera automatiska uppdateringar** på sidan Installerade tillägg, om er globala policy tillåter det.
 
 Inställningar lagras i WordPress options och överlever filuppdateringar. En felaktig release-asset erbjuds inte som uppdatering; installationspaketet måste innehålla pluginfilen och en giltig versionsheader. Ta backup och använd WordPress återställningsfunktion eller installera föregående ZIP om en uppdatering misslyckas. Läs [CHANGELOG.md](CHANGELOG.md) före release.
 

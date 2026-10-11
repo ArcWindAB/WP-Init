@@ -64,10 +64,6 @@ class ArcWind_Init_GitHub_Updater {
         }
 
         $release = $this->get_latest_release();
-        if (empty($release)) {
-            return $result;
-        }
-
         $info = new stdClass();
         $info->name          = 'ArcWind Init';
         $info->slug          = $this->plugin_slug;
@@ -78,9 +74,26 @@ class ArcWind_Init_GitHub_Updater {
         $info->tested        = '';
         $info->requires_php  = '';
         $info->download_link = !empty($release['package']) ? $release['package'] : '';
+        $changelog = !empty($release['changelog'])
+            ? '<p>' . wp_kses_post($release['changelog']) . '</p>'
+            : '<p>Versionsnyheter finns under <a href="https://github.com/' . self::GITHUB_REPO . '/releases">GitHub Releases</a>.</p>';
         $info->sections      = [
-            'description' => 'ArcWind Init för PostHog, dashboard-widget och feedback-widget.',
-            'changelog'   => !empty($release['changelog']) ? wp_kses_post($release['changelog']) : 'Ingen changelog tillgänglig.',
+            'description' => '<p>ArcWind Init samlar tre valfria integrationer i WordPress. Aktivera bara de delar webbplatsen använder.</p>' .
+                '<ul>' .
+                '<li><strong>PostHog:</strong> Spåra besök och händelser, välj region eller reverse proxy och visa statistik för de senaste sju dagarna på adminpanelen.</li>' .
+                '<li><strong>Feedback:</strong> Ge administratörer en direktlänk till ert feedbackformulär.</li>' .
+                '<li><strong>Driftstatus:</strong> Visa incidenter och planerat underhåll från en publik statussida. Följ tillgänglighet de senaste sju dagarna och övervaka webbplatsen med heartbeat.</li>' .
+                '</ul>' .
+                '<p>Inställningarna finns under <strong>Inställningar → ArcWind Init</strong>. Dashboard-kort visas först när respektive integration är konfigurerad.</p>',
+            'installation' => '<ol>' .
+                '<li>Installera pluginets release-ZIP och aktivera ArcWind Init.</li>' .
+                '<li>Öppna <strong>Inställningar → ArcWind Init</strong> och konfigurera PostHog, Feedback eller statussidan efter behov.</li>' .
+                '<li>Kontrollera anslutningarna på fliken <strong>Diagnostik</strong>.</li>' .
+                '</ol><p>Pluginet uppdateras från GitHub Releases. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.</p>',
+            'faq' => '<h3>Måste alla integrationer konfigureras?</h3><p>Nej. Varje integration kan användas separat. Okonfigurerade statistik- och feedbackkort visas inte.</p>' .
+                '<h3>Vad händer om en extern tjänst är nere?</h3><p>WordPress fortsätter fungera. Statuskortet kan visa senast kända data, tydligt märkta som inaktuella.</p>' .
+                '<h3>Var finns mer dokumentation?</h3><p>Se <a href="https://github.com/' . self::GITHUB_REPO . '#readme">projektets README på GitHub</a>.</p>',
+            'changelog' => $changelog,
         ];
 
         return $info;

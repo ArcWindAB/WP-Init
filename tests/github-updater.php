@@ -19,6 +19,7 @@ function wp_remote_retrieve_response_code($value) { return $value['code']; }
 function wp_remote_retrieve_body($value) { return $value['body']; }
 function wp_parse_url($value) { return parse_url($value); }
 function esc_html($value) { return htmlspecialchars($value, ENT_QUOTES); }
+function wp_kses_post($value) { return $value; }
 function trailingslashit($value) { return rtrim($value, '/') . '/'; }
 function wp_normalize_path($value) { return str_replace('\\', '/', $value); }
 function check($condition, $message) { if (!$condition) throw new Exception($message); }
@@ -40,6 +41,11 @@ foreach ([
 $response = ['code' => 200, 'body' => json_encode($release)];
 $update = $updater->filter_update(false, [], 'arcwind-init/arcwind-init.php', []);
 check($update['version'] === '1.8.0' && $update['package'] === $url, 'Update was not detected');
+$info = $updater->filter_plugin_info(false, 'plugin_information', (object) ['slug' => 'arcwind-init']);
+check(is_object($info) && isset($info->sections['description'], $info->sections['installation'], $info->sections['faq'], $info->sections['changelog']), 'Plugin information sections are missing');
+check(strpos($info->sections['description'], 'PostHog') !== false && strpos($info->sections['description'], 'Driftstatus') !== false, 'Plugin description omits an integration');
+check(strpos($info->sections['installation'], 'Inställningar') !== false, 'Plugin installation guidance is missing');
+check($updater->filter_plugin_info(false, 'plugin_information', (object) ['slug' => 'other']) === false, 'Another plugin information response was modified');
 check($updater->filter_update(false, [], 'other/plugin.php', []) === false, 'Another plugin was modified');
 check($requests === 1, 'Release cache was not used');
 
@@ -47,6 +53,9 @@ $transients = [];
 $response = new WP_Error('rate_limited', 'secret-token');
 $update = $updater->filter_update(false, [], 'arcwind-init/arcwind-init.php', []);
 check($update['version'] === '1.7.0' && $update['package'] === '', 'API failure offered an unsafe update');
+$offline_info = $updater->filter_plugin_info(false, 'plugin_information', (object) ['slug' => 'arcwind-init']);
+check(is_object($offline_info) && $offline_info->version === '1.7.0' && $offline_info->download_link === '', 'Plugin information disappeared during API failure');
+check(strpos($offline_info->sections['changelog'], 'GitHub Releases') !== false, 'Missing release notes had no useful fallback');
 $count = $requests;
 $updater->filter_update(false, [], 'arcwind-init/arcwind-init.php', []);
 check($requests === $count, 'API failure was not cached');

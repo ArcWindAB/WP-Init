@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: ArcWind Init
- * Description: Initierar PostHog (EU som standard) och lägger till en enkel dashboard-widget “Statistik” (aktiva användare & sidvisningar) samt en feedback-widget. Inkluderar felspårning.
+ * Description: Valfria integrationer för PostHog-spårning och statistik, feedback samt driftstatus och heartbeat.
  * Version:     1.7.0
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
