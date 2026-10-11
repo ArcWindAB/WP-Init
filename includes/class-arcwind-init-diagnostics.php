@@ -35,7 +35,9 @@ class ArcWind_Init_Diagnostics {
     public function test_connections() {
         $result = [];
         $settings = (array) get_option(ArcWind_Init::OPTION_KEY, []);
-        $host = is_string($settings['host'] ?? null) ? rtrim($settings['host'], '/') : '';
+        $region = ($settings['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
+        $host = is_string($settings['ui_host'] ?? null) && $settings['ui_host'] !== ''
+            ? rtrim($settings['ui_host'], '/') : 'https://' . $region . '.posthog.com';
         $project = is_scalar($settings['project_id'] ?? null) ? (string) $settings['project_id'] : '';
         $key = is_string($settings['personal_api_key'] ?? null) ? $settings['personal_api_key'] : '';
         if (!$host || !$project || !$key || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {

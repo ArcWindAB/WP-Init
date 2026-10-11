@@ -137,20 +137,39 @@ class ArcWind_Init_OneUptime {
         $settings = self::options();
         $host_ready = $settings['host'] !== '';
         $status_ready = $settings['host'] !== '' && $settings['status_page_id'] !== '';
+        $integration_ready = !empty($settings['enabled']) && $status_ready;
+        $information_enabled = !empty($settings['banner_public']) || !empty($settings['banner_admin']);
+        $information_has_events = false;
+        foreach (['public', 'admin'] as $place) {
+            if (empty($settings['banner_' . $place])) continue;
+            foreach (['incidents', 'announcements', 'maintenance'] as $type) {
+                if (!empty($settings[$place . '_' . $type])) $information_has_events = true;
+            }
+        }
+        $states = [
+            'arcwind_oneuptime_connection' => $integration_ready ? 'active' : ($host_ready || $settings['status_page_id'] !== '' ? 'error' : 'inactive'),
+            'arcwind_oneuptime_information' => !$information_enabled ? 'inactive' : ($integration_ready && $information_has_events ? 'active' : ($host_ready || $settings['status_page_id'] !== '' ? 'error' : 'inactive')),
+            'arcwind_oneuptime_heartbeat' => empty($settings['heartbeat_enabled']) ? 'inactive' : (!empty($settings['enabled']) && $host_ready && $settings['heartbeat_secret'] !== '' ? 'active' : ($host_ready || $settings['heartbeat_secret'] !== '' ? 'error' : 'inactive')),
+            'arcwind_oneuptime_alerts' => empty($settings['alerts_admin']) ? 'inactive' : ($integration_ready && $settings['alerts_api_key'] !== '' ? 'active' : ($host_ready || $settings['status_page_id'] !== '' || $settings['alerts_api_key'] !== '' ? 'error' : 'inactive')),
+        ];
+        $icons = ['active' => ['yes-alt', 'Aktiv'], 'inactive' => ['minus', 'Av'], 'error' => ['warning', 'Behöver konfigureras']];
         $groups = [
             'arcwind_oneuptime_connection' => ['Statussida', 'Ange OneUptime-värd och statussidans ID. Adressen skapas automatiskt.'],
             'arcwind_oneuptime_information' => ['Driftinformation', 'Välj vilka händelser som visas på webbplatsen och i WordPress-admin.'],
             'arcwind_oneuptime_heartbeat' => ['Heartbeat', 'En heartbeat är en återkommande signal till OneUptime. Skapa en Incoming Request-monitor och ange dess heartbeat-ID. WP-Cron skickar signalen ungefär varje minut när webbplatsen får trafik.'],
             'arcwind_oneuptime_alerts' => ['Alerts', 'Visa olösta alerts från monitorerna på statussidan i WordPress-admin. API-nyckeln behöver läsbehörighet för Alert och Alert State.'],
         ];
-        echo '<style>#arcwind-oneuptime-settings tbody[hidden]{display:none}#arcwind-oneuptime-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-oneuptime-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-oneuptime-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}</style>';
+        echo '<style>#arcwind-oneuptime-settings tbody[hidden]{display:none}#arcwind-oneuptime-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-oneuptime-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-oneuptime-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}#arcwind-oneuptime-settings .arcwind-section-status{display:inline-flex;vertical-align:middle;margin-left:8px}#arcwind-oneuptime-settings .arcwind-section-status-active{color:#008a20}#arcwind-oneuptime-settings .arcwind-section-status-inactive{color:#646970}#arcwind-oneuptime-settings .arcwind-section-status-error{color:#b26200}</style>';
+        echo '<p class="description">Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.</p>';
         echo '<table class="form-table" role="presentation" id="arcwind-oneuptime-settings">';
         foreach ($groups as $section => $details) {
             $open = $section === 'arcwind_oneuptime_connection';
             $locked = ($section === 'arcwind_oneuptime_heartbeat' && !$host_ready) ||
                 (in_array($section, ['arcwind_oneuptime_information', 'arcwind_oneuptime_alerts'], true) && !$status_ready);
             $target = $section . '_fields';
-            echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($section === 'arcwind_oneuptime_information' ? ' <span id="arcwind-oneuptime-status-required"' . ($status_ready ? ' hidden' : '') . '>Fyll i värd och statussidans ID för att låsa upp valen.</span>' : '') . ($section === 'arcwind_oneuptime_heartbeat' ? ' <span id="arcwind-oneuptime-host-required"' . ($host_ready ? ' hidden' : '') . '>Fyll i OneUptime-värd för att låsa upp heartbeat.</span>' : '') . '</p></th></tr></tbody>';
+            $state = $states[$section];
+            $status_label = 'Sparad status: ' . $icons[$state][1];
+            echo '<tbody><tr><th colspan="2" scope="colgroup"><button class="button-link" type="button" aria-controls="' . esc_attr($target) . '" aria-expanded="' . ($open ? 'true' : 'false') . '"' . ($locked ? ' disabled' : '') . '><span class="dashicons dashicons-arrow-' . ($open ? 'down' : 'right') . '-alt2" aria-hidden="true"></span> ' . esc_html($details[0]) . '</button><span class="arcwind-section-status arcwind-section-status-' . esc_attr($state) . '" role="img" aria-label="' . esc_attr($status_label) . '" title="' . esc_attr($status_label) . '"><span class="dashicons dashicons-' . esc_attr($icons[$state][0]) . '" aria-hidden="true"></span></span><p class="description" style="font-weight:normal">' . esc_html($details[1]) . ($section === 'arcwind_oneuptime_information' ? ' <span id="arcwind-oneuptime-status-required"' . ($status_ready ? ' hidden' : '') . '>Fyll i värd och statussidans ID för att låsa upp valen.</span>' : '') . ($section === 'arcwind_oneuptime_heartbeat' ? ' <span id="arcwind-oneuptime-host-required"' . ($host_ready ? ' hidden' : '') . '>Fyll i OneUptime-värd för att låsa upp heartbeat.</span>' : '') . '</p></th></tr></tbody>';
             echo '<tbody id="' . esc_attr($target) . '"' . ($open ? '' : ' hidden') . '>';
             do_settings_fields('arcwind_init_oneuptime', $section);
             echo '</tbody>';

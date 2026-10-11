@@ -17,23 +17,26 @@ Release-ZIP-filen ska ha `arcwind-init/` som enda rotmapp, med `arcwind-init.php
 
 | Fält | Standard | Funktion |
 | --- | --- | --- |
-| PostHog-värd | `https://tel.arc.vin/_p` | HTTPS-värd för serverfrågor och capture. Äldre installationer fortsätter använda den som webbsnippets värd tills de väljer en separat Webb-API-adress. |
-| Project ID | tomt | Projekt för statistikwidgetens Query API. |
-| Personal API Key | tomt | Hemlig servernyckel för Query API. Visas inte i formuläret efter sparning; tomt fält behåller den, kryssrutan raderar den. |
+| Projekt-ID | tomt | Projekt för statistikwidgetens Query API. |
+| Personal API Key | tomt | Hemlig servernyckel för Query API. Efter sparning visas en knapp som sparar formuläret och tar bort nyckeln. Inmatningsfältet visas igen när nyckeln har tagits bort. |
 | Aktivera spårning | på | Laddar PostHog i frontend och wp-admin när publik nyckel finns. |
-| Public API Key | tomt | Publik `phc_...`-nyckel för webbläsare och server-side capture. |
-| PostHog-region | EU | Väljer direkta `api_host` (`eu.i.posthog.com` eller `us.i.posthog.com`) och `ui_host` (`eu.posthog.com` eller `us.posthog.com`) när egna adresser saknas. Ändra även servervärden om Query API ska byta region. |
-| Webb-API / reverse proxy | tomt | Valfri HTTPS-adress för webbsnippets `api_host`, inklusive eventuell sökväg. Tomt använder vald regions direktadress på nya installationer. Äldre installationers befintliga webbadress bevaras vid första sparning. Proxyn måste vidarebefordra både SDK-filer och eventanrop. |
-| PostHog UI-värd | tomt | Valfri HTTPS-adress för `ui_host`. Tomt använder vald region. Vid reverse proxy ska detta normalt vara PostHogs riktiga gränssnittsvärd. |
-| SDK defaults | tomt | Datum i formatet `YYYY-MM-DD`, t.ex. `2026-05-30`, som skickas som `defaults`. Tomt utelämnar inställningen och bevarar SDK:s tidigare beteende. |
-| Person profiles | SDK-standard | `identified_only` eller `always`; SDK-standard utelämnar inställningen. |
-| Registrera sidvisning | på | PostHogs `capture_pageview`. Verkar bara när spårningen är aktiv. |
-| Autocapture | på | PostHogs automatiska interaktionsspårning. Verkar bara när spårningen är aktiv. |
-| Laddningsposition | `head` | `head` eller `footer` i frontend och admin. |
+| Projekt-token | tomt | Publik `phc_...`-nyckel för webbläsare och server-side capture. |
+| PostHog-region | EU | Väljer direkta `api_host` (`eu.i.posthog.com` eller `us.i.posthog.com`) och `ui_host` (`eu.posthog.com` eller `us.posthog.com`) när egna adresser saknas. |
+| PostHog API-värd eller proxy | tomt | HTTPS-adress för webbsnippets `api_host` och serverns event, inklusive eventuell sökväg. Tomt använder vald regions direktadress på nya installationer. Äldre installationers befintliga webbadress bevaras vid första sparning. En proxy måste vidarebefordra både SDK-filer och eventanrop. |
+| PostHog UI-värd | tomt | Valfri HTTPS-adress för `ui_host` och privata Query API. Tomt använder vald region. Vid reverse proxy ska detta normalt vara PostHogs riktiga gränssnittsvärd, inte proxyadressen. |
+| SDK defaults | SDK-standard | Välj en av PostHogs daterade standardprofiler i en lista. SDK-standard utelämnar `defaults`; ett datum aktiverar standardbeteenden från den profilen. |
+| Person profiles | SDK-standard | `identified_only` skapar profiler för identifierade besökare; `always` även för anonyma. SDK-standard utelämnar inställningen. |
+| Registrera sidvisning | på | Skickar `$pageview` när sidan laddas. Avmarkera om sidvisningar redan registreras på annat sätt. |
+| Autocapture | på | Registrerar vanliga klick och formulärhändelser automatiskt. |
+| Laddningsposition | `head` | `head` startar tidigt; `footer` laddar skriptet senare, både i frontend och admin. |
 | Aktivera felspårning | på | Skickar pluginets generiska felhändelser via server-side capture när publik nyckel finns. |
 | Distinct ID för fel | `arcwind-init:server` | ID för dessa serverhändelser. |
 
-**Statistik** på WordPress dashboard visas först när HTTPS-värd, Project ID och Personal API Key finns. Den visar unika användare och sidvisningar för sju dagar, frågar PostHogs Query API och cachelagrar i tio minuter. API-fel ger tomma värden och kort felcache. Feltexter återger inte API-svar eller nycklar. Manuell cache-rensning finns under Diagnostik.
+PostHog-inställningarna visas i en gemensam tabell. **PostHog-anslutning** är öppen från början och innehåller region, API-värd, UI-värd, projekt-ID och projekt-token. Webbspårning innehåller även SDK defaults, person profiles och laddningsposition och öppnas när API-värd och projekt-token finns. Dashboardstatistik kräver projekt-ID och felspårning kräver API-värd och projekt-token. Ett låst avsnitt visas grått och kan öppnas direkt när dess fält fyllts i. UI-värden är valfri och används för PostHogs gränssnitt och privata Query API.
+
+Ikoner bredvid avsnitten visar den sparade inställningens status: grön bock betyder aktiv, grått streck betyder av och orange varning betyder att något som behövs saknas. Ikonerna visar konfiguration, inte resultatet av ett anslutningstest.
+
+**Statistik** på WordPress dashboard visas när projekt-ID och personlig API-nyckel finns. Den använder UI-värden eller vald regions HTTPS-adress för PostHogs Query API, visar unika användare och sidvisningar för sju dagar och cachelagrar i tio minuter. API-fel ger tomma värden och kort felcache. Feltexter återger inte API-svar eller nycklar. Manuell cache-rensning finns under Diagnostik.
 
 Webbsnippet laddas bara när spårning är aktiverad och den publika nyckeln finns. Inloggade användare identifieras med WordPress-användar-ID och attribut som visningsnamn, användarnamn, roller, administratörsstatus och SHA-256-hash av e-post. Även admin-sidor omfattas. Bedöm därför rättslig grund, information till användare och eventuellt samtycke för er webbplats innan spårningen aktiveras. Pluginet innehåller ingen egen samtyckeshanterare.
 
@@ -73,6 +76,8 @@ Widgeten visas först när feedback är aktiverad och ett giltigt UUID finns. De
 
 Statussida, Driftinformation, Heartbeat och Alerts finns som öppningsbara avsnitt i samma inställningstabell. Heartbeat är låst tills OneUptime-värden har fyllts i. Driftinformation och Alerts är låsta tills både värd och status-ID har fyllts i. Äldre sparade URL:er och visningsval läses in automatiskt.
 
+Varje OneUptime-avsnitt har samma statusikoner som PostHog: grön bock för aktiv sparad konfiguration, grått streck för av och orange varning när ett aktiverat avsnitt saknar uppgifter.
+
 OneUptime-data hämtas från statussidans publika API. Bannern visar högst tio meddelanden och filtrerar framtida announcements, avslutade incidenter och avslutat underhåll. Dismiss-knappar använder webbläsarens session storage per användare; nya incident-ID:n påverkas inte av tidigare dismiss. Incidenter utan ID kan inte avfärdas. WordPress admin-bar flyttas efter bannerns uppmätta höjd när den visas.
 
 Alerts hämtas separat från OneUptimes autentiserade API med den sparade nyckeln. Pluginet läser monitorerna direkt från den konfigurerade statussidan, inklusive monitorer i sidans monitorgrupper, och visar bara deras olösta alerts. Om monitorerna inte kan läsas visas inga alerts. Resultatet cachas i en minut. Alerts visas aldrig i den publika bannern.
@@ -104,7 +109,7 @@ Inställningar lagras i WordPress options och överlever filuppdateringar. En fe
 Bygg och validera en release lokalt:
 
 ```sh
-python3 scripts/build-release.py --tag v1.7.0
+python3 scripts/build-release.py --tag v2.0.0
 python3 scripts/build-release.py --validate-only
 ```
 

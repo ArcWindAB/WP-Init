@@ -7,7 +7,11 @@ class ArcWind_Init_Tracker {
         $opts = (array) get_option(ArcWind_Init::OPTION_KEY, []);
 
         $public_key = is_string($opts['public_api_key'] ?? null) ? $opts['public_api_key'] : '';
-        $host       = is_string($opts['host'] ?? null) ? rtrim($opts['host'], '/') : '';
+        $region     = ($opts['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
+        $host       = is_string($opts['api_host'] ?? null) && $opts['api_host'] !== ''
+            ? rtrim($opts['api_host'], '/')
+            : (array_key_exists('api_host', $opts) ? 'https://' . $region . '.i.posthog.com'
+                : (is_string($opts['host'] ?? null) ? rtrim($opts['host'], '/') : 'https://' . $region . '.i.posthog.com'));
 
         if (empty($public_key) || empty($host) || !is_string($event) || $event === '' || wp_parse_url($host, PHP_URL_SCHEME) !== 'https') {
             return false;

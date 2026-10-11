@@ -104,6 +104,7 @@ try {
     ArcWind_Init_OneUptime::render_settings_table();
     $no_host_settings = ob_get_clean();
     check((bool) preg_match('/aria-controls="arcwind_oneuptime_heartbeat_fields" aria-expanded="false" disabled/', $no_host_settings), 'Heartbeat was not locked when OneUptime host was missing');
+    check((bool) preg_match('/aria-controls="arcwind_oneuptime_connection_fields"[^>]*>.*?<\/button><span class="arcwind-section-status arcwind-section-status-error"/', $no_host_settings), 'Incomplete OneUptime status page was not marked as needing configuration');
     check(strpos($no_host_settings, 'Fyll i OneUptime-värd för att låsa upp heartbeat.') !== false, 'Heartbeat host hint was missing');
     $options['host'] = 'https://status.example.test';
     $options['status_page_id'] = '';
@@ -113,6 +114,11 @@ try {
     check((bool) preg_match('/aria-controls="arcwind_oneuptime_heartbeat_fields" aria-expanded="false"><span/', $host_only_settings), 'Heartbeat remained locked when host was provided');
     check((bool) preg_match('/aria-controls="arcwind_oneuptime_information_fields" aria-expanded="false" disabled/', $host_only_settings), 'Driftinformation unlocked without status page ID');
     $options = $saved_options;
+    ob_start();
+    ArcWind_Init_OneUptime::render_settings_table();
+    $configured_settings = ob_get_clean();
+    check((bool) preg_match('/aria-controls="arcwind_oneuptime_connection_fields"[^>]*>.*?<\/button><span class="arcwind-section-status arcwind-section-status-active"/', $configured_settings), 'Configured OneUptime status page was not marked active');
+    check((bool) preg_match('/aria-controls="arcwind_oneuptime_heartbeat_fields"[^>]*>.*?<\/button><span class="arcwind-section-status arcwind-section-status-inactive"/', $configured_settings), 'Disabled OneUptime heartbeat was not marked inactive');
     load_fixture('valid');
     [$banner, $dashboard, $notice] = render_pair();
     check(ArcWind_Init_OneUptime::options()['status_url'] === 'https://status.example.test/status-page/page-1', 'Legacy status URL was not migrated to a public page link');

@@ -7,7 +7,9 @@ trait ArcWind_Init_Dashboard_Trait {
      * ========================= */
     public function register_dashboard_widgets() {
         $options = $this->options();
-        if (!empty($options['host']) && wp_parse_url($options['host'], PHP_URL_SCHEME) === 'https' &&
+        $region = ($options['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
+        $ui_host = ($options['ui_host'] ?? '') ?: 'https://' . $region . '.posthog.com';
+        if (wp_parse_url($ui_host, PHP_URL_SCHEME) === 'https' &&
             !empty($options['project_id']) && !empty($options['personal_api_key'])) {
             wp_add_dashboard_widget(
                 'arcwind_init_dashboard_widget',
@@ -30,7 +32,6 @@ trait ArcWind_Init_Dashboard_Trait {
         $opts = $this->options();
         $missing = [];
 
-        if (empty($opts['host']))             $missing[] = 'Värd';
         if (empty($opts['project_id']))       $missing[] = 'Project ID';
         if (empty($opts['personal_api_key'])) $missing[] = 'Personal API Key';
 
@@ -113,7 +114,9 @@ trait ArcWind_Init_Dashboard_Trait {
 
     private function query_posthog($hogql, &$errors) {
         $opts = $this->options();
-        $host       = is_string($opts['host'] ?? null) ? rtrim($opts['host'], '/') : '';
+        $region     = ($opts['region'] ?? 'eu') === 'us' ? 'us' : 'eu';
+        $host       = is_string($opts['ui_host'] ?? null) && $opts['ui_host'] !== ''
+            ? rtrim($opts['ui_host'], '/') : 'https://' . $region . '.posthog.com';
         $project_id = is_scalar($opts['project_id'] ?? null) ? (string) $opts['project_id'] : '';
         $api_key    = is_string($opts['personal_api_key'] ?? null) ? $opts['personal_api_key'] : '';
 

@@ -45,9 +45,16 @@ try {
         if ($tab !== 'oneuptime') arcwind_smoke_check(strpos($html, 'secret-token') === false, 'Settings page leaked a secret: ' . $tab);
         arcwind_smoke_check(strpos($html, 'private-alert-key') === false, 'Settings page leaked the alert API key: ' . $tab);
         if ($tab === 'posthog') {
+            arcwind_smoke_check(substr_count($html, '<table class="form-table"') === 1, 'PostHog settings did not use one table');
+            foreach (['arcwind_init_connection_fields', 'arcwind_init_frontend_fields', 'arcwind_init_main_fields', 'arcwind_init_errors_fields'] as $section) {
+                arcwind_smoke_check(strpos($html, 'aria-controls="' . $section . '"') !== false && strpos($html, 'id="' . $section . '"') !== false, 'PostHog settings section missing: ' . $section);
+            }
             foreach (['api_host', 'ui_host', 'region', 'defaults', 'person_profiles'] as $field) {
                 arcwind_smoke_check(strpos($html, 'arcwind_init_settings[' . $field . ']') !== false, 'PostHog field missing: ' . $field);
             }
+            arcwind_smoke_check(strpos($html, 'arcwind_init_settings[host]') === false, 'Old PostHog server host was still shown');
+            arcwind_smoke_check(strpos($html, 'name="arcwind_init_settings[personal_api_key_clear]"') !== false, 'Saved PostHog API key did not have a remove button');
+            arcwind_smoke_check(strpos($html, 'name="arcwind_init_settings[personal_api_key]"') === false, 'PostHog API key input appeared while a key was saved');
         }
         if ($tab === 'oneuptime') {
             arcwind_smoke_check(substr_count($html, '<table class="form-table"') === 1, 'OneUptime settings did not use one table');

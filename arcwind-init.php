@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ArcWind Init
  * Description: Valfria integrationer för PostHog-spårning och statistik, feedback samt driftstatus och heartbeat.
- * Version:     1.7.0
+ * Version:     2.0.0
  * Author:      ArcWind AB
  * License:     GPL-2.0-or-later
  * Text Domain: arcwind-init
