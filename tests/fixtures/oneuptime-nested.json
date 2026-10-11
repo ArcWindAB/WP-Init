@@ -1,0 +1,15 @@
+{
+  "overview": {
+    "statusPage": {"displayName": "Nested status"},
+    "overallStatus": {"name": "Operational", "color": {"value": "#237a45"}},
+    "statusPageResources": [{"_id": {"value": "resource-2"}, "displayName": "API", "statusPageGroupId": {"value": "group-2"}}],
+    "resourceGroups": [{"_id": {"value": "group-2"}, "name": "Backend"}]
+  },
+  "uptime": {
+    "statusPageResourceUptimes": null,
+    "groupUptimes": [{"statusPageResourceUptimes": [{"statusPageResourceId": {"value": "resource-2"}, "uptimePercent": 98.5, "currentStatus": {"name": "Degraded"}}]}]
+  },
+  "incidents": {"incidents": [{"title": "Nested incident", "currentIncidentState": {"name": "Investigating"}}]},
+  "announcements": {"announcements": [{"title": "Nested notice", "showAnnouncementAt": {"date": {"value": "2020-01-01T00:00:00Z"}}}]},
+  "scheduled-maintenance-events": {"scheduledMaintenanceEvents": [{"title": "Nested maintenance", "endsAt": {"$date": "2099-01-01T00:00:00Z"}}]}
+}

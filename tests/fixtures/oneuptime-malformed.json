@@ -1,0 +1,17 @@
+{
+  "overview": {
+    "overallStatus": ["unexpected"],
+    "statusPage": {"name": ["unexpected"]},
+    "statusPageResources": [{"_id": {"value": ["bad"]}, "name": ["bad"], "statusPageGroupId": {"value": ["bad"]}}, false],
+    "resourceGroups": "bad",
+    "activeIncidents": [{"title": ["bad"], "currentIncidentState": "bad"}],
+    "activeEpisodes": 42
+  },
+  "uptime": {
+    "statusPageResourceUptimes": "bad",
+    "groupUptimes": [{"statusPageResourceUptimes": "bad"}, null]
+  },
+  "incidents": {"incidents": [{"title": ["bad"], "currentIncidentState": {"name": ["bad"]}}, null]},
+  "announcements": {"announcements": [{"title": "Invalid date notice", "showAnnouncementAt": ["bad"]}]},
+  "scheduled-maintenance-events": {"scheduledMaintenanceEvents": [{"title": "Invalid date maintenance", "endsAt": ["bad"]}]}
+}

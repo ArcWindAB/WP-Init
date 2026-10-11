@@ -1,0 +1,15 @@
+{
+  "overview": {
+    "statusPage": {"name": "Example status"},
+    "overallStatus": {"name": "Operational", "color": {"value": "#237a45"}},
+    "statusPageResources": [{"_id": "resource-1", "name": "Website", "statusPageGroupId": "group-1"}],
+    "resourceGroups": [{"_id": "group-1", "name": "Services"}],
+    "activeIncidents": [{"title": "Recent incident", "currentIncidentState": {"name": "Investigating"}}]
+  },
+  "uptime": {
+    "statusPageResourceUptimes": [{"statusPageResourceId": "resource-1", "currentStatus": {"name": "Operational", "color": "#237a45"}, "uptimePercent": 99.95}]
+  },
+  "incidents": {"incidents": [{"title": "Open incident", "currentIncidentState": {"name": "Investigating"}}]},
+  "announcements": {"announcements": [{"title": "Notice", "showAnnouncementAt": "2020-01-01T00:00:00Z"}]},
+  "scheduled-maintenance-events": {"scheduledMaintenanceEvents": [{"title": "Planned work", "endsAt": "2099-01-01T00:00:00Z"}]}
+}
