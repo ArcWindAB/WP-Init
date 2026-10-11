@@ -8,6 +8,7 @@ class ArcWind_Init_OneUptime_Dashboard {
     const CACHE = 'arcwind_init_oneuptime_overview_v2';
     const LAST_GOOD = 'arcwind_init_oneuptime_last_good_v2';
     const FAILURE_CACHE = 'arcwind_init_oneuptime_overview_failure_v2';
+    const OVERVIEW_HOOK = 'arcwind_init_oneuptime_refresh_overview';
     const HISTORY_CACHE = 'arcwind_init_oneuptime_history_v1';
     const HISTORY_LAST_GOOD = 'arcwind_init_oneuptime_history_good_v1';
     const HISTORY_FAILURE = 'arcwind_init_oneuptime_history_failure_v1';
@@ -16,6 +17,7 @@ class ArcWind_Init_OneUptime_Dashboard {
 
     public function __construct() {
         add_action('wp_dashboard_setup', [$this, 'register_widget']);
+        add_action(self::OVERVIEW_HOOK, [$this, 'refresh_overview']);
         add_action(self::HISTORY_HOOK, [$this, 'refresh_history']);
     }
 
@@ -40,11 +42,21 @@ class ArcWind_Init_OneUptime_Dashboard {
         $cached = get_transient(self::CACHE);
         if (is_array($cached) && isset($cached['data']) && is_array($cached['data'])) return $cached;
         if (get_transient(self::FAILURE_CACHE) !== false) return $this->stale_overview();
+        if (!wp_next_scheduled(self::OVERVIEW_HOOK)) {
+            wp_schedule_single_event(time(), self::OVERVIEW_HOOK);
+            if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
+        }
+        return $this->stale_overview();
+    }
+
+    public function refresh_overview() {
+        $options = $this->options();
+        if (!$options['enabled'] || !$options['status_page_id'] || !$options['status_url']) return;
         $url = wp_parse_url($options['status_url']);
         if (!is_array($url) || ($url['scheme'] ?? '') !== 'https' || empty($url['host'])) return new WP_Error('invalid_url', 'Ogiltig HTTPS-adress.');
         $host = 'https://' . $url['host'] . (!empty($url['port']) ? ':' . (int) $url['port'] : '');
         $endpoint = $host . '/status-page-api/overview/' . rawurlencode($options['status_page_id']);
-        $data = ArcWind_Init_OneUptime::request_api($endpoint, 'overview');
+        $data = ArcWind_Init_OneUptime::request_api($endpoint, 'overview', 'GET', 5);
         if (is_wp_error($data)) {
             set_transient(self::FAILURE_CACHE, 1, MINUTE_IN_SECONDS);
             return $this->stale_overview();
@@ -60,7 +72,7 @@ class ArcWind_Init_OneUptime_Dashboard {
         if ($data['overallStatus'] !== null && !is_array($data['overallStatus'])) {
             ArcWind_Init_OneUptime::api_diagnostic('overview', 'invalid overallStatus');
         }
-        $uptime = ArcWind_Init_OneUptime::request_api($host . '/status-page-api/uptime/' . rawurlencode($options['status_page_id']), 'uptime', 'POST');
+        $uptime = ArcWind_Init_OneUptime::request_api($host . '/status-page-api/uptime/' . rawurlencode($options['status_page_id']), 'uptime', 'POST', 5);
         if (!is_wp_error($uptime)) $data['_arcwindUptime'] = $uptime;
         $result = ['data' => $data, 'fetched_at' => time(), 'stale' => false];
         set_transient(self::CACHE, $result, MINUTE_IN_SECONDS);

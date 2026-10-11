@@ -22,7 +22,7 @@ class ArcWind_Init_Tracker {
                 $user = wp_get_current_user();
                 $distinct_id = (string) $user->ID;
             } else {
-                $distinct_id = 'wordpress:server';
+                $distinct_id = 'wordpress:server'; // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- Machine identifier.
             }
         }
 

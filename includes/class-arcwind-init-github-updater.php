@@ -122,9 +122,11 @@ class ArcWind_Init_GitHub_Updater {
             !empty($release['version']) && $header['Version'] !== $release['version']) {
             return new WP_Error('invalid_package', 'Uppdateringspaketets version stämmer inte med releasen.');
         }
-        $desired = trailingslashit(WP_PLUGIN_DIR . '/' . $this->plugin_slug);
+        // Keep the package in WordPress's upgrade working directory. Core must
+        // back up and replace the installed plugin itself for rollback to work.
+        $desired = trailingslashit(dirname(rtrim($source, '/\\'))) . $this->plugin_slug;
 
-        if (wp_normalize_path($source) === wp_normalize_path($desired)) {
+        if (wp_normalize_path(rtrim($source, '/\\')) === wp_normalize_path(rtrim($desired, '/\\'))) {
             return $source;
         }
 
@@ -133,7 +135,11 @@ class ArcWind_Init_GitHub_Updater {
             return new WP_Error('filesystem_unavailable', 'WordPress filsystem är inte tillgängligt.');
         }
 
-        if ($wp_filesystem->move($source, $desired, true)) {
+        if ($wp_filesystem->exists($desired)) {
+            return new WP_Error('invalid_package', 'Uppdateringens arbetskatalog är redan upptagen.');
+        }
+
+        if ($wp_filesystem->move($source, $desired, false)) {
             return $desired;
         }
 
@@ -195,7 +201,10 @@ class ArcWind_Init_GitHub_Updater {
             foreach ($json['assets'] as $asset) {
                 if (!is_array($asset) || ($asset['name'] ?? null) !== 'arcwind-init.zip') continue;
                 $url = $asset['browser_download_url'] ?? null;
-                if (self::valid_package_url($url)) $package = $url;
+                if (self::valid_package_url($url) &&
+                    wp_parse_url($url, PHP_URL_PATH) === '/ArcWindAB/WP-Init/releases/download/' . $tag_name . '/arcwind-init.zip') {
+                    $package = $url;
+                }
                 break;
             }
         }

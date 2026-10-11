@@ -25,10 +25,15 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          tools: none
+          tools: composer
+          extensions: mysqli, zip
+      - name: Install development checks
+        run: composer install --no-interaction --prefer-dist --no-progress
       - name: Lint and regression tests
         run: |
-          find . -path './.git' -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l
+          find arcwind-init.php includes tests -name '*.php' -print0 | xargs -0 -n1 php -l
+          composer cs
+          composer analyse
           php tests/oneuptime-dates.php
           php tests/oneuptime-responses.php
           php tests/oneuptime-heartbeat.php
@@ -48,13 +53,43 @@ jobs:
         if: matrix.php == '8.3' && matrix.wordpress == 'latest'
         run: |
           curl -fsSLo /tmp/arcwind-old.zip https://github.com/ArcWindAB/WP-Init/releases/download/v1.6.1/arcwind-init.zip
-          /tmp/wp plugin install /tmp/arcwind-old.zip --activate --path=/tmp/arcwind-wp
+          mkdir -p /tmp/arcwind-old
+          unzip -q /tmp/arcwind-old.zip -d /tmp/arcwind-old
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import zipfile
+          main = Path('/tmp/arcwind-old/arcwind-init/arcwind-init.php')
+          text = main.read_text()
+          updated, count = re.subn(r'(?m)^(\s*\* Version:\s*)1\.6\.1', r'\g<1>1.6.2', text, count=1)
+          if count != 1:
+              raise SystemExit('Could not create the synthetic 1.6.2 upgrade fixture')
+          main.write_text(updated)
+          root = main.parent.parent
+          with zipfile.ZipFile('/tmp/arcwind-old-1.6.2.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for file in sorted(main.parent.rglob('*')):
+                  if file.is_file():
+                      archive.write(file, file.relative_to(root))
+          PY
+          /tmp/wp plugin install /tmp/arcwind-old-1.6.2.zip --activate --path=/tmp/arcwind-wp
           /tmp/wp option update arcwind_init_settings '{"public_api_key":"phc_placeholder","feedback_uuid":"TEST1234","feedback_enabled":1}' --format=json --path=/tmp/arcwind-wp
       - name: Install current build and smoke test
         run: |
           /tmp/wp plugin install "$GITHUB_WORKSPACE/dist/arcwind-init.zip" --activate --force --path=/tmp/arcwind-wp
           ARCWIND_EXPECT_UPGRADE=${{ matrix.php == '8.3' && matrix.wordpress == 'latest' && '1' || '' }} /tmp/wp eval-file "$GITHUB_WORKSPACE/tests/wp-smoke.php" --path=/tmp/arcwind-wp
+          /tmp/wp option update home http://127.0.0.1:18888 --path=/tmp/arcwind-wp
+          /tmp/wp option update siteurl http://127.0.0.1:18888 --path=/tmp/arcwind-wp
+          php -S 127.0.0.1:18888 -t /tmp/arcwind-wp >/tmp/arcwind-wp-server.log 2>&1 &
+          sleep 1
+          mkdir -p /tmp/arcwind-wp/wp-content/mu-plugins
+          cp "$GITHUB_WORKSPACE/tests/wp-offline-fixture.php" /tmp/arcwind-wp/wp-content/mu-plugins/arcwind-offline-fixture.php
+          /tmp/wp eval-file "$GITHUB_WORKSPACE/tests/wp-http-failure-setup.php" --path=/tmp/arcwind-wp
+          bash "$GITHUB_WORKSPACE/tests/wp-admin-pages.sh"
           /tmp/wp eval-file "$GITHUB_WORKSPACE/tests/wp-updater-smoke.php" --path=/tmp/arcwind-wp
+          bash "$GITHUB_WORKSPACE/tests/wp-admin-pages.sh"
+          if [ '${{ matrix.php }}' = '8.3' ] && [ '${{ matrix.wordpress }}' = 'latest' ]; then
+            bash "$GITHUB_WORKSPACE/tests/wp-module-failure.sh"
+          fi
           /tmp/wp plugin deactivate arcwind-init --path=/tmp/arcwind-wp
       - uses: actions/upload-artifact@v4
         if: startsWith(github.ref, 'refs/tags/') && matrix.php == '8.3' && matrix.wordpress == 'latest'

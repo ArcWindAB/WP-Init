@@ -8,14 +8,18 @@ class ArcWind_Init_OneUptime {
     const KEY = 'arcwind_init_oneuptime';
     const CACHE = 'arcwind_init_oneuptime_incident';
     const ALERT_CACHE = 'arcwind_init_oneuptime_alerts';
+    const MESSAGE_HOOK = 'arcwind_init_oneuptime_refresh_messages';
+    const ALERT_HOOK = 'arcwind_init_oneuptime_refresh_alerts';
     const HOOK = 'arcwind_init_oneuptime_heartbeat';
     const HEARTBEAT_HEALTH = 'arcwind_init_oneuptime_heartbeat_health';
 
     public function __construct() {
         add_action('admin_init', [$this, 'register_settings']);
-        add_filter('cron_schedules', [$this, 'add_minute_interval']);
+        add_filter('cron_schedules', [$this, 'add_minute_interval']); // phpcs:ignore WordPress.WP.CronInterval.CronSchedulesInterval -- Incoming Request heartbeat needs a one-minute interval.
         add_action('init', [$this, 'sync_cron']);
         add_action(self::HOOK, [$this, 'send_heartbeat']);
+        add_action(self::MESSAGE_HOOK, [$this, 'refresh_messages']);
+        add_action(self::ALERT_HOOK, [self::class, 'refresh_alerts']);
         add_action('wp_body_open', [$this, 'render_banner'], -100);
         add_action('admin_notices', [$this, 'render_admin_notice']);
         add_action('wp_head', [$this, 'banner_styles']);
@@ -220,12 +224,14 @@ class ArcWind_Init_OneUptime {
         $out['alerts_api_key'] = !empty($raw['alerts_api_key_clear']) ? '' : ($new_key !== '' ? $new_key : $existing['alerts_api_key']);
         delete_transient(self::CACHE);
         delete_transient(self::ALERT_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_LAST_GOOD);
-        delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_FAILURE);
+        if (class_exists('ArcWind_Init_OneUptime_Dashboard')) {
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::LAST_GOOD);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_LAST_GOOD);
+            delete_transient(ArcWind_Init_OneUptime_Dashboard::HISTORY_FAILURE);
+        }
         return $out;
     }
 
@@ -245,7 +251,14 @@ class ArcWind_Init_OneUptime {
 
     public static function deactivate() {
         wp_clear_scheduled_hook(self::HOOK);
-        wp_clear_scheduled_hook(ArcWind_Init_OneUptime_Dashboard::HISTORY_HOOK);
+        wp_clear_scheduled_hook(self::MESSAGE_HOOK);
+        wp_clear_scheduled_hook(self::ALERT_HOOK);
+        if (defined('ArcWind_Init_OneUptime_Dashboard::OVERVIEW_HOOK')) {
+            wp_clear_scheduled_hook(ArcWind_Init_OneUptime_Dashboard::OVERVIEW_HOOK);
+        }
+        if (defined('ArcWind_Init_OneUptime_Dashboard::HISTORY_HOOK')) {
+            wp_clear_scheduled_hook(ArcWind_Init_OneUptime_Dashboard::HISTORY_HOOK);
+        }
     }
 
     public static function uninstall() {
@@ -437,8 +450,18 @@ class ArcWind_Init_OneUptime {
         if (!$o['enabled'] || !$o['banner_' . $place] || !$o['status_page_id'] || !$o['status_url']) return [];
         $cached = get_transient(self::CACHE);
         if ($cached !== false && is_array($cached)) return $this->messages_for_place(self::api_messages($cached), $o, $place);
+        if (!wp_next_scheduled(self::MESSAGE_HOOK)) {
+            wp_schedule_single_event(time(), self::MESSAGE_HOOK);
+            if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
+        }
+        return [];
+    }
+
+    public function refresh_messages() {
+        $o = $this->options();
+        if (!$o['enabled'] || !$o['status_page_id'] || !$o['status_url']) return;
         $parsed = wp_parse_url($o['status_url']);
-        if (!$parsed || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host'])) return [];
+        if (!$parsed || ($parsed['scheme'] ?? '') !== 'https' || empty($parsed['host'])) return;
         $base = 'https://' . $parsed['host'];
         if (!empty($parsed['port'])) $base .= ':' . (int) $parsed['port'];
         $api = $base . '/status-page-api/';
@@ -495,7 +518,6 @@ class ArcWind_Init_OneUptime {
             }
         }
         set_transient(self::CACHE, $messages, MINUTE_IN_SECONDS);
-        return $this->messages_for_place($messages, $o, $place);
     }
 
     private function messages_for_place($messages, $options, $place) {
@@ -579,6 +601,16 @@ class ArcWind_Init_OneUptime {
         if (!$o['enabled'] || !$o['alerts_admin'] || !$o['host'] || !$o['status_page_id'] || !$o['alerts_api_key']) return [];
         $cached = get_transient(self::ALERT_CACHE);
         if (is_array($cached)) return $cached;
+        if (!wp_next_scheduled(self::ALERT_HOOK)) {
+            wp_schedule_single_event(time(), self::ALERT_HOOK);
+            if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
+        }
+        return [];
+    }
+
+    public static function refresh_alerts() {
+        $o = self::options();
+        if (!$o['enabled'] || !$o['alerts_admin'] || !$o['host'] || !$o['status_page_id'] || !$o['alerts_api_key']) return;
         $overview = self::request_api($o['host'] . '/status-page-api/overview/' . rawurlencode($o['status_page_id']), 'alert-page-overview', 'GET', 5);
         $monitor_ids = is_wp_error($overview) ? [] : self::status_page_monitor_ids($overview);
         if (!$monitor_ids) {
@@ -626,7 +658,7 @@ class ArcWind_Init_OneUptime {
     public function banner_styles() {
         $o = $this->options();
         if (!$o['enabled'] || !$o['banner_enabled']) return;
-        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner .arcwind-oneuptime-message{padding:10px 20px;text-align:center;background:#8b211c;color:#fff}#arcwind-oneuptime-banner .arcwind-oneuptime-message.announcement{background:#195b88}#arcwind-oneuptime-banner .arcwind-oneuptime-message.maintenance{background:#f4c75b;color:#181818}#arcwind-oneuptime-banner a{color:inherit;text-decoration:underline;font-weight:600}#arcwind-oneuptime-banner button{margin-left:12px;color:inherit;background:transparent;border:1px solid currentColor;border-radius:3px;cursor:pointer}#arcwind-oneuptime-banner :focus-visible{outline:3px solid currentColor;outline-offset:2px}body.admin-bar #arcwind-oneuptime-banner{margin-top:calc(-1 * var(--wp-admin--admin-bar--height,32px));margin-bottom:var(--wp-admin--admin-bar--height,32px)}body.admin-bar #wpadminbar{top:var(--arcwind-banner-height,0px)}@media(max-width:782px){body.admin-bar #arcwind-oneuptime-banner{margin-top:calc(-1 * var(--wp-admin--admin-bar--height,46px));margin-bottom:var(--wp-admin--admin-bar--height,46px)}}</style>';
+        echo '<style id="arcwind-oneuptime-css">#arcwind-oneuptime-banner{position:relative;z-index:999999;font-size:14px;line-height:1.5}#arcwind-oneuptime-banner .arcwind-oneuptime-message{padding:10px 20px;text-align:center;background:#8b211c;color:#fff}#arcwind-oneuptime-banner .arcwind-oneuptime-message.announcement{background:#195b88}#arcwind-oneuptime-banner .arcwind-oneuptime-message.maintenance{background:#f4c75b;color:#181818}#arcwind-oneuptime-banner a{color:inherit;text-decoration:underline;font-weight:600}#arcwind-oneuptime-banner button{margin-left:12px;padding:3px 8px;color:inherit;background:transparent;border:1px solid currentColor;border-radius:3px;cursor:pointer}#arcwind-oneuptime-banner :focus-visible{outline:3px solid currentColor;outline-offset:2px}body.admin-bar #arcwind-oneuptime-banner{position:fixed;top:0;left:0;right:0;margin:0}body.admin-bar #wpadminbar{top:var(--arcwind-banner-height,0px)}@media(max-width:782px){#arcwind-oneuptime-banner .arcwind-oneuptime-message{padding:8px 12px}#arcwind-oneuptime-banner button{min-height:36px}}</style>';
     }
 
     public function render_banner() {
@@ -638,13 +670,13 @@ class ArcWind_Init_OneUptime {
             $labels = ['incident' => 'Driftstörning', 'announcement' => 'Information', 'maintenance' => 'Planerat underhåll'];
             $id = self::api_text($item['id'] ?? null);
             $dismissible = $id !== '' || $item['type'] !== 'incident';
-            $key = hash('sha256', $item['type'] . '|' . ($id !== '' ? $id : $item['title']));
+            $key = hash('sha256', $item['type'] . '|' . $id . '|' . $item['title']);
             echo '<div class="arcwind-oneuptime-message ' . esc_attr($item['type']) . '" role="' . ($item['type'] === 'incident' ? 'alert' : 'status') . '" data-dismiss-key="' . esc_attr($key) . '"><strong>' . esc_html($labels[$item['type']]) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a>';
             if ($dismissible) echo ' <button type="button" aria-label="Dölj ' . esc_attr($labels[$item['type']]) . '">Stäng</button>';
             echo '</div>';
         }
         echo '</div>';
-        echo '<script>(function(){try{var banner=document.getElementById("arcwind-oneuptime-banner"), prefix="arcwind-banner-' . esc_js((string) get_current_user_id()) . '-";if(!banner)return;function update(){document.documentElement.style.setProperty("--arcwind-banner-height",banner.offsetHeight+"px")}Array.prototype.forEach.call(banner.querySelectorAll("[data-dismiss-key]"),function(row){var key=prefix+row.getAttribute("data-dismiss-key"),button=row.querySelector("button");try{if(sessionStorage.getItem(key)==="1")row.remove()}catch(e){}if(button)button.addEventListener("click",function(){try{sessionStorage.setItem(key,"1")}catch(e){}row.remove();update()})});update();if(window.ResizeObserver)new ResizeObserver(update).observe(banner);else window.addEventListener("resize",update)}catch(e){}})();</script>';
+        echo '<script>(function(){try{var banner=document.getElementById("arcwind-oneuptime-banner"),prefix="arcwind-banner-' . esc_js((string) get_current_user_id()) . '-",root=document.documentElement;if(!banner)return;function update(){var height=banner.children.length?banner.offsetHeight:0;root.style.setProperty("--arcwind-banner-height",height+"px");if(document.body.classList.contains("admin-bar")){root.style.setProperty("margin-top","calc(var(--wp-admin--admin-bar--height,32px) + "+height+"px)","important")}}Array.prototype.forEach.call(banner.querySelectorAll("[data-dismiss-key]"),function(row){var key=prefix+row.getAttribute("data-dismiss-key"),button=row.querySelector("button");try{var expiry=Number(localStorage.getItem(key));if(expiry>Date.now())row.remove();else if(expiry)localStorage.removeItem(key)}catch(e){}if(button)button.addEventListener("click",function(){try{localStorage.setItem(key,String(Date.now()+86400000))}catch(e){}row.remove();update()})});update();if(window.ResizeObserver)new ResizeObserver(update).observe(banner);else window.addEventListener("resize",update)}catch(e){}})();</script>';
     }
 
     public function render_admin_notice() {
@@ -654,7 +686,8 @@ class ArcWind_Init_OneUptime {
                 echo '<div class="notice notice-info inline"><p><strong>' . esc_html(ucfirst($item['type'])) . ':</strong> ' . esc_html($item['title']) . ' <a href="' . esc_url($item['url']) . '">Läs mer</a></p></div>';
             }
         }
-        if (isset($_GET['page']) && $_GET['page'] === 'arcwind_init') return;
+        // Page identity only determines where the notice is rendered.
+        if (isset($_GET['page']) && sanitize_key(wp_unslash($_GET['page'])) === 'arcwind_init') return; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         self::render_alert_notice();
     }
 

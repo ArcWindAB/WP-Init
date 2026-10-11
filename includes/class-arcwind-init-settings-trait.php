@@ -107,10 +107,12 @@ trait ArcWind_Init_Settings_Trait {
             },
             'arcwind_init_feedback_tab'
         );
-        add_settings_field('arcwind_init_feedback_enabled', __('Aktivera feedback', 'arcwind-init'),
-            [$this, 'render_feedback_enabled'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
-        add_settings_field('arcwind_init_feedback_uuid', __('Feedback-UUID (t.ex. MM0H1A5A)', 'arcwind-init'),
-            [$this, 'render_input_feedback_uuid'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
+        if (method_exists($this, 'render_feedback_enabled')) {
+            add_settings_field('arcwind_init_feedback_enabled', __('Aktivera feedback', 'arcwind-init'),
+                [$this, 'render_feedback_enabled'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
+            add_settings_field('arcwind_init_feedback_uuid', __('Feedback-UUID (t.ex. MM0H1A5A)', 'arcwind-init'),
+                [$this, 'render_input_feedback_uuid'], 'arcwind_init_feedback_tab', 'arcwind_init_feedback');
+        }
 
         add_settings_section(
             'arcwind_init_errors',
@@ -138,7 +140,6 @@ trait ArcWind_Init_Settings_Trait {
 
     public function sanitize_settings($input) {
         $old = get_option(self::OPTION_KEY, []);
-        $tab = isset($_POST['arcwind_init_active_tab']) && is_string($_POST['arcwind_init_active_tab']) ? sanitize_key(wp_unslash($_POST['arcwind_init_active_tab'])) : 'posthog';
         $input = is_array($input) ? $input : [];
         // Keep the old browser host when an existing installation first gains
         // the separate API host setting. New installations use the region host.
@@ -185,7 +186,8 @@ trait ArcWind_Init_Settings_Trait {
 
     public function render_settings_page() {
         if (!current_user_can('manage_options')) return;
-        $tab = isset($_GET['tab']) && is_string($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'posthog';
+        // The tab only selects page content; no action is performed here.
+        $tab = isset($_GET['tab']) && is_string($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'posthog'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if (!in_array($tab, ['posthog', 'feedback', 'oneuptime', 'diagnostics'], true)) $tab = 'posthog';
         $tabs = ['posthog' => 'PostHog', 'feedback' => 'Feedback', 'oneuptime' => 'OneUptime', 'diagnostics' => 'Diagnostik'];
         echo '<div class="wrap"><h1>ArcWind Init – Inställningar</h1><nav class="nav-tab-wrapper" aria-label="Integrationer">';
@@ -194,16 +196,18 @@ trait ArcWind_Init_Settings_Trait {
             echo '<a class="nav-tab ' . ($tab === $key ? 'nav-tab-active' : '') . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
         }
         echo '</nav>';
-        ArcWind_Init_OneUptime::render_alert_notice();
+        if (class_exists('ArcWind_Init_OneUptime')) ArcWind_Init_OneUptime::render_alert_notice();
         if ($tab === 'diagnostics') {
-            $this->diagnostics->render();
+            if ($this->diagnostics) $this->diagnostics->render();
+            else echo '<p>' . esc_html__('Diagnostics are temporarily unavailable.', 'arcwind-init') . '</p>';
             echo '</div>';
             return;
         }
         echo '<form method="post" action="options.php">';
         if ($tab === 'oneuptime') {
             settings_fields('arcwind_init_oneuptime_group');
-            ArcWind_Init_OneUptime::render_settings_table();
+            if (class_exists('ArcWind_Init_OneUptime')) ArcWind_Init_OneUptime::render_settings_table();
+            else echo '<p>' . esc_html__('Service status settings are temporarily unavailable.', 'arcwind-init') . '</p>';
         } else {
             settings_fields('arcwind_init_settings_group');
             echo '<input type="hidden" name="arcwind_init_active_tab" value="' . esc_attr($tab) . '">';

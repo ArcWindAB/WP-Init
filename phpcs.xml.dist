@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<ruleset name="ArcWind Init">
+    <description>WordPress security and compatibility rules for production PHP.</description>
+    <file>arcwind-init.php</file>
+    <file>includes</file>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <arg name="extensions" value="php"/>
+    <config name="installed_paths" value="vendor/wp-coding-standards/wpcs,vendor/phpcsstandards/phpcsextra,vendor/phpcsstandards/phpcsutils"/>
+    <rule ref="WordPress.Security"/>
+    <rule ref="WordPress.WP"/>
+</ruleset>

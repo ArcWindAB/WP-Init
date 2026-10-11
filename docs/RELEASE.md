@@ -1,9 +1,9 @@
-# Releasechecklista
+# Release checklist
 
-1. Uppdatera versionsheadern i `arcwind-init.php` och flytta relevanta punkter från **Unreleased** till samma version i `CHANGELOG.md`.
-2. Uppdatera README och utvecklarguiden när beteende, standardvärden, PHP/WordPress-stöd eller begränsningar ändrats. Kontrollera att exemplen bara innehåller platshållare.
-3. Kör PHP-lint, regressionstester, WordPress-rökprov och ZIP-validering. Kontrollera CI-matrisen och att uppgradering bevarar options.
-4. Bygg med `python3 scripts/build-release.py --tag vX.Y.Z`. ZIP-filen ska ha `arcwind-init/` som rot och samma version i pluginfilen.
-5. Skapa GitHub Release för taggen `vX.Y.Z`. Arbetsflödet `build-release.yml` skapar och laddar upp `arcwind-init.zip` när releasen publiceras. Kontrollera att assetet finns och att dess versionsheader stämmer med taggen. GitHubs genererade source-ZIP är inte pluginets installationspaket.
-6. På en separat WordPress-testinstallation: kontrollera att uppdateringen syns under Installerade tillägg, att WordPress egen **Aktivera automatiska uppdateringar** går att använda och att manuell uppdatering fungerar. Prova återställning med föregående ZIP vid ett avbrutet/ogiltigt paket.
-7. Kontrollera efter uppgradering att PostHog-, Feedback- och OneUptime-inställningar finns kvar, att högst ett heartbeat-jobb finns och att frontend, wp-admin och dashboard laddar under simulerade API-fel.
+1. Update the version header in `arcwind-init.php`. Move the relevant entries from **Unreleased** in `CHANGELOG.md` to the new version.
+2. Update the README and development guide when behavior, defaults, security, supported PHP or WordPress versions, or limitations change. Use placeholders in examples.
+3. Run PHP lint, WordPress Coding Standards, PHPStan, regression tests, WordPress integration tests, and archive validation. Check the continuous integration matrix and option preservation during upgrade. See [DEVELOPMENT.md](DEVELOPMENT.md).
+4. Build with `python3 scripts/build-release.py --tag vX.Y.Z`. The ZIP must have `arcwind-init/` as its root and the same version in the plugin header.
+5. Publish a GitHub Release for tag `vX.Y.Z`. The `build-release.yml` workflow checks out that tag, builds the ZIP, and uploads `arcwind-init.zip`. Verify that the asset exists and its version matches the tag. GitHub's generated source ZIP is not the installable package.
+6. On a separate WordPress test installation, check that the update appears under **Installed Plugins**, that WordPress's **Enable auto-updates** control works, and that a valid package installs. Check that an invalid package leaves the installed code intact.
+7. After the upgrade, verify that PostHog, Feedback, and OneUptime options remain available. Check that at most one heartbeat job exists. Confirm that the frontend, login, administration, and dashboard load when external services fail.

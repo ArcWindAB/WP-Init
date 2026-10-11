@@ -82,6 +82,8 @@ try {
         return ['headers' => [], 'body' => wp_json_encode($body), 'response' => ['code' => 200, 'message' => 'OK'], 'cookies' => [], 'filename' => null];
     };
     add_filter('pre_http_request', $mock, 10, 3);
+    $oneuptime->refresh_messages();
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
     ob_start();
     (new ArcWind_Init_OneUptime_Dashboard())->render();
     $dashboard = ob_get_clean();
@@ -104,6 +106,7 @@ try {
     delete_transient('arcwind_init_stats_v1');
     $offline = static function () { return new WP_Error('offline', 'External service unavailable'); };
     add_filter('pre_http_request', $offline, 10, 3);
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
     ob_start();
     (new ArcWind_Init_OneUptime_Dashboard())->render();
     $offline_html = ob_get_clean();
@@ -123,7 +126,48 @@ try {
     $plugin->maybe_print_posthog_snippet_universal();
     $tracking_html = ob_get_clean();
     arcwind_smoke_check(strpos($tracking_html, 'phc_test_public') !== false, 'Tracking snippet failed during external outages');
+    $plugin->enqueue_tracking_bridge();
+    $tracker_script = wp_scripts()->registered['arcwind-init-tracker']->src ?? '';
+    arcwind_smoke_check(strpos($tracker_script, '/arcwind-init/assets/js/arcwind-init-tracker.js') !== false &&
+        strpos($tracker_script, '/includes/assets/') === false, 'Tracker script URL did not point to the plugin root');
     remove_filter('pre_http_request', $offline, 10);
+
+    $oneuptime_failure_options = $options;
+    $oneuptime_failure_options['alerts_admin'] = 1;
+    $oneuptime_failure_options['alerts_api_key'] = 'private-test-key';
+    update_option(ArcWind_Init_OneUptime::KEY, $oneuptime_failure_options, false);
+    $failures = [
+        new WP_Error('offline', 'secret-response-text'),
+        ['headers' => [], 'body' => 'rate limited', 'response' => ['code' => 429, 'message' => 'Too Many Requests']],
+        ['headers' => [], 'body' => '{bad json', 'response' => ['code' => 200, 'message' => 'OK']],
+        ['headers' => [], 'body' => ['unexpected' => 'array'], 'response' => ['code' => 200, 'message' => 'OK']],
+        'exception',
+    ];
+    foreach ($failures as $failure) {
+        $failure_mock = static function () use ($failure) {
+            if ($failure === 'exception') throw new RuntimeException('secret-response-text');
+            return $failure;
+        };
+        add_filter('pre_http_request', $failure_mock, 10, 3);
+        foreach ([ArcWind_Init_OneUptime::CACHE, ArcWind_Init_OneUptime::ALERT_CACHE,
+            ArcWind_Init_OneUptime_Dashboard::CACHE, ArcWind_Init_OneUptime_Dashboard::FAILURE_CACHE,
+            'arcwind_init_stats_v1'] as $cache) delete_transient($cache);
+        $started = microtime(true);
+        ob_start();
+        $oneuptime->render_banner();
+        $oneuptime->render_admin_notice();
+        (new ArcWind_Init_OneUptime_Dashboard())->render();
+        $plugin->render_dashboard_widget();
+        $plugin->render_feedback_widget();
+        $html = ob_get_clean();
+        arcwind_smoke_check(microtime(true) - $started < 2, 'External failures delayed page rendering');
+        arcwind_smoke_check(strpos($html, 'TEST1234') !== false && strpos($html, 'secret-response-text') === false, 'External failure broke Feedback or leaked a response');
+        $oneuptime->refresh_messages();
+        (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
+        ArcWind_Init_OneUptime::refresh_alerts();
+        $plugin->refresh_posthog_stats();
+        remove_filter('pre_http_request', $failure_mock, 10);
+    }
     echo "WordPress activation and failure smoke tests passed.\n";
 } finally {
     update_option(ArcWind_Init::OPTION_KEY, $old_settings, false);

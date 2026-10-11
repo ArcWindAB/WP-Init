@@ -18,7 +18,8 @@ trait ArcWind_Init_Dashboard_Trait {
             );
         }
 
-        if ((!isset($options['feedback_enabled']) || $options['feedback_enabled']) &&
+        if (method_exists($this, 'render_feedback_widget') &&
+            (!isset($options['feedback_enabled']) || $options['feedback_enabled']) &&
             !empty($options['feedback_uuid']) && preg_match('/^[A-Za-z0-9]+$/', $options['feedback_uuid'])) {
             wp_add_dashboard_widget(
                 'arcwind_init_feedback_widget',
@@ -47,32 +48,11 @@ trait ArcWind_Init_Dashboard_Trait {
         if (!is_array($data) || !array_key_exists('active_7d', $data) || !array_key_exists('pageviews_7d', $data)) $data = false;
 
         if (false === $data) {
-            $errors = [];
-
-            // Active users (7 days)
-            $active_7d = $this->fetch_scalar(
-                'SELECT count(DISTINCT distinct_id) AS c FROM events WHERE timestamp >= now() - INTERVAL 7 DAY',
-                $errors
-            );
-
-            // Pageviews (7 days)
-            $pageviews_7d = $this->fetch_scalar(
-                'SELECT count() AS c FROM events WHERE event = \'$pageview\' AND timestamp >= now() - INTERVAL 7 DAY',
-                $errors
-            );
-
-            $data = [
-                'active_7d'    => is_numeric($active_7d) ? (int)$active_7d : null,
-                'pageviews_7d' => is_numeric($pageviews_7d) ? (int)$pageviews_7d : null,
-                'errors'       => $errors,
-                'fetched_at'   => current_time('mysql'),
-            ];
-
-            set_transient($cache_key, $data, 10 * MINUTE_IN_SECONDS);
-
-            if (!empty($errors)) {
-                set_transient(self::ERR_TRANSIENT, $errors, self::ERR_TTL);
+            if (!wp_next_scheduled('arcwind_init_refresh_posthog_stats')) {
+                wp_schedule_single_event(time(), 'arcwind_init_refresh_posthog_stats');
+                if (function_exists('spawn_cron') && (!defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON)) spawn_cron(time());
             }
+            $data = ['active_7d' => null, 'pageviews_7d' => null, 'fetched_at' => 'väntar på hämtning'];
         }
 
         echo '<div class="arcwind-grid">';
@@ -81,6 +61,27 @@ trait ArcWind_Init_Dashboard_Trait {
         echo '</div>';
 
         echo '<p class="arcwind-subtle">Uppdaterad: ' . esc_html(is_string($data['fetched_at'] ?? null) ? $data['fetched_at'] : 'okänd') . '. Cache: 10 min.</p>';
+    }
+
+    public function refresh_posthog_stats() {
+        $opts = $this->options();
+        if (empty($opts['project_id']) || empty($opts['personal_api_key'])) return;
+        $errors = [];
+        $active_7d = $this->fetch_scalar(
+            'SELECT count(DISTINCT distinct_id) AS c FROM events WHERE timestamp >= now() - INTERVAL 7 DAY',
+            $errors
+        );
+        $pageviews_7d = $this->fetch_scalar(
+            'SELECT count() AS c FROM events WHERE event = \'$pageview\' AND timestamp >= now() - INTERVAL 7 DAY',
+            $errors
+        );
+        set_transient('arcwind_init_stats_v1', [
+            'active_7d' => is_numeric($active_7d) ? (int) $active_7d : null,
+            'pageviews_7d' => is_numeric($pageviews_7d) ? (int) $pageviews_7d : null,
+            'errors' => $errors,
+            'fetched_at' => current_time('mysql'),
+        ], empty($errors) ? 10 * MINUTE_IN_SECONDS : MINUTE_IN_SECONDS);
+        if ($errors) set_transient(self::ERR_TRANSIENT, $errors, self::ERR_TTL);
     }
 
     private function render_stat_card($title, $value) {
@@ -206,7 +207,7 @@ trait ArcWind_Init_Dashboard_Trait {
 
         $distinct_id = is_string($opts['error_distinct_id'] ?? null) && $opts['error_distinct_id'] !== '' ? $opts['error_distinct_id'] : 'arcwind-init:server';
 
-        ArcWind_Init_Tracker::capture('arcwind_init_error', array_merge([
+        if (class_exists('ArcWind_Init_Tracker')) ArcWind_Init_Tracker::capture('arcwind_init_error', array_merge([
             'kind'    => (string) $kind,
             'message' => (string) $message,
             'php'     => PHP_VERSION,

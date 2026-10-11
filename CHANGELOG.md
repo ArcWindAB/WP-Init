@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Fetch PostHog dashboard data and OneUptime banners, status, and alerts in background WordPress Cron jobs so external failures do not delay page rendering.
+- Place the public status banner above the WordPress toolbar on desktop and mobile. Keep dismissals for at most 24 hours and show changed incidents again.
+- Fix the PostHog tracking bridge URL on frontend and admin pages. Disable WordPress navigation transitions on the ArcWind settings page to avoid an aborted browser transition.
+- Stage GitHub update packages inside WordPress's temporary upgrade directory to preserve core backup and rollback behavior. Validate automatic updates, invalid packages, and saved settings in WordPress integration tests.
+- Add WordPress Coding Standards, PHPStan, HTTP admin-page checks, and a documented synthetic 1.6.2 upgrade fixture to continuous integration.
+- Add `AGENTS.md` with source, administrator, and public language guidelines. Update development and release documentation.
+
 ## 2.0.0
 
 - Use `api_host` for server-side event capture and `ui_host` (or the selected region) for private Query API requests, removing the separate PostHog server-host field.

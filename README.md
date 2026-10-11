@@ -36,7 +36,7 @@ PostHog-inställningarna visas i en gemensam tabell. **PostHog-anslutning** är 
 
 Ikoner bredvid avsnitten visar den sparade inställningens status: grön bock betyder aktiv, grått streck betyder av och orange varning betyder att något som behövs saknas. Ikonerna visar konfiguration, inte resultatet av ett anslutningstest.
 
-**Statistik** på WordPress dashboard visas när projekt-ID och personlig API-nyckel finns. Den använder UI-värden eller vald regions HTTPS-adress för PostHogs Query API, räknar unika `distinct_id` och sidvisningar för de senaste sju dagarna och cachelagrar resultatet i tio minuter. Vid API-fel visas ett streck i stället för ett värde. När felspårning är på skickas dessa Query API-fel som generiska PostHog-händelser. Manuell cache-rensning finns under Diagnostik.
+**Statistik** på WordPress dashboard visas när projekt-ID och personlig API-nyckel finns. Den använder UI-värden eller vald regions HTTPS-adress för PostHogs Query API, räknar unika `distinct_id` och sidvisningar för de senaste sju dagarna och cachelagrar resultatet i tio minuter. Uppgifterna hämtas via WP-Cron; innan första hämtningen eller vid API-fel visas ett streck i stället för ett värde. Vid fel används en kortare cachetid på en minut. När felspårning är på skickas dessa Query API-fel som generiska PostHog-händelser. Manuell cache-rensning finns under Diagnostik.
 
 Webbsnippet laddas bara när spårning är aktiverad och projekt-token finns. Det körs både på webbplatsen och i wp-admin. Inloggade användare identifieras med WordPress-användar-ID och attribut som visningsnamn, användarnamn, roller, administratörsstatus och SHA-256-hash av e-post. Pluginet innehåller ingen egen samtyckeshanterare.
 
@@ -78,11 +78,11 @@ Statussida, Driftinformation, Heartbeat och Alerts finns som öppningsbara avsni
 
 Varje OneUptime-avsnitt har samma statusikoner som PostHog: grön bock för aktiv sparad konfiguration, grått streck för av och orange varning när ett aktiverat avsnitt saknar uppgifter.
 
-OneUptime-data hämtas från statussidans publika API. Bannern visar högst tio meddelanden och filtrerar framtida announcements, avslutade incidenter och avslutat underhåll. Dismiss-knappar använder webbläsarens session storage per användare; nya incident-ID:n påverkas inte av tidigare dismiss. Incidenter utan ID kan inte avfärdas. WordPress admin-bar flyttas efter bannerns uppmätta höjd när den visas.
+OneUptime-data hämtas från statussidans publika API i bakgrunden via WP-Cron. Bannern visar högst tio meddelanden och filtrerar framtida meddelanden, avslutade incidenter och avslutat underhåll. Stäng-knappar sparar valet i webbläsarens lokala lagring i högst 24 timmar per användare och meddelande. En incident med nytt ID eller ändrad titel visas igen. Incidenter utan ID kan inte stängas. Bannerns uppmätta höjd ger plats ovanför WordPress verktygsfält på dator och mobil.
 
-Alerts hämtas separat från OneUptimes autentiserade API med den sparade nyckeln. Pluginet läser monitorerna direkt från den konfigurerade statussidan, inklusive monitorer i sidans monitorgrupper, och visar bara deras olösta alerts. Om monitorerna inte kan läsas visas inga alerts. Resultatet cachas i en minut. Alerts visas aldrig i den publika bannern.
+Alerts hämtas separat i bakgrunden från OneUptimes autentiserade API med den sparade nyckeln. Pluginet läser monitorerna direkt från den konfigurerade statussidan, inklusive monitorer i sidans monitorgrupper, och visar bara deras olösta alerts. Om monitorerna inte kan läsas visas inga alerts. Resultatet cachas i en minut. Alerts visas aldrig i den publika bannern.
 
-Dashboard-widgeten använder statussidans namn som rubrik när API:et kan läsa det; annars visas **Driftstatus**. Övergripande status syns direkt; grupper och nästlade grupper öppnas vid behov, medan tjänsterna visas som enkla rader. Aktuell status cachas i en minut. Drifttid för **de senaste 7 dagarna** hämtas i ett separat WP-Cron-jobb och kan saknas på första sidladdningen. Utebliven drifttid märks **uppgift saknas**. När API:et fallerar väntar widgeten 60 sekunder innan ett nytt försök; senast kända data kan visas i upp till ett dygn och märks **ej aktuell** med grå statusindikator och tidsstämpel. Oväntade API-format hanteras utan att svarskroppar eller URL:er loggas.
+Dashboard-widgeten använder statussidans namn som rubrik när API:et kan läsa det; annars visas **Driftstatus**. Övergripande status syns direkt; grupper och nästlade grupper öppnas vid behov, medan tjänsterna visas som enkla rader. Aktuell status hämtas via WP-Cron och cachas i en minut. Drifttid för **de senaste 7 dagarna** hämtas i ett separat WP-Cron-jobb och kan saknas på första sidladdningen. Utebliven drifttid märks **uppgift saknas**. När API:et fallerar väntar widgeten 60 sekunder innan ett nytt försök; senast kända data kan visas i upp till ett dygn och märks **ej aktuell** med grå statusindikator och tidsstämpel. Oväntade API-format hanteras utan att svarskroppar eller URL:er loggas.
 
 ### Heartbeat och WP-Cron
 
@@ -130,7 +130,7 @@ Publicera sedan ZIP-filen som `arcwind-init.zip` på en GitHub Release vars tagg
 
 ## Utveckling och struktur
 
-`arcwind-init.php` är bootstrap och registrerar livscykel-hooks. `includes/` innehåller fokuserade moduler för inställningar, PostHog, feedback, dashboard, OneUptime, diagnostik och uppdateringar. `assets/js/` innehåller klient-API:t. `tests/` innehåller fixture-baserade regressionstester och ett WordPress-rökprov. `scripts/build-release.py` bygger och validerar ZIP-filen. Se [utvecklarguiden](docs/DEVELOPMENT.md) för testkommandon och CI-matris.
+`arcwind-init.php` är bootstrap och registrerar livscykel-hooks. `includes/` innehåller fokuserade moduler för inställningar, PostHog, feedback, dashboard, OneUptime, diagnostik och uppdateringar. `assets/js/` innehåller klient-API:t. `tests/` innehåller fixture-baserade regressionstester och WordPress-integrationskontroller. `scripts/build-release.py` bygger och validerar ZIP-filen. Se [utvecklarguiden](docs/DEVELOPMENT.md) för testkommandon och CI-matris samt [AGENTS.md](AGENTS.md) för språk- och utvecklingsregler.
 
 ## Licens
 

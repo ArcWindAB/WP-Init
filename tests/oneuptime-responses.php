@@ -54,6 +54,8 @@ function esc_html($value) { if (!is_string($value)) throw new Exception('Non-str
 function esc_attr($value) { return esc_html($value); }
 function esc_js($value) { return esc_html($value); }
 function esc_url($value) { return esc_html($value); }
+function sanitize_key($value) { return strtolower(preg_replace('/[^a-z0-9_\-]/i', '', $value)); }
+function wp_unslash($value) { return $value; }
 function sanitize_text_field($value) { if (!is_string($value)) throw new Exception('Non-string title'); return trim(strip_tags($value)); }
 function number_format_i18n($value, $decimals) { return number_format($value, $decimals); }
 function admin_url($path) { return 'https://example.test/wp-admin/' . $path; }
@@ -77,6 +79,8 @@ function load_fixture($name) {
     $payloads = fixture($name);
     $responses = [];
     foreach ($payloads as $endpoint => $payload) $responses[$endpoint] = respond(json_encode($payload));
+    (new ArcWind_Init_OneUptime())->refresh_messages();
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
 }
 function render_pair() {
     $banner = new ArcWind_Init_OneUptime();
@@ -130,6 +134,8 @@ try {
     $options['public_incidents'] = 0;
     $options['admin_incidents'] = 1;
     $transients = [];
+    (new ArcWind_Init_OneUptime())->refresh_messages();
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
     [$public_filtered, , $admin_filtered] = render_pair();
     check(strpos($public_filtered, 'Open incident') === false && strpos($admin_filtered, 'Open incident') !== false, 'Separate incident controls did not isolate public and admin');
     $options['public_incidents'] = 1;
@@ -144,13 +150,13 @@ try {
     $history_dashboard->refresh_history();
     check($request_count === $requests_before_history + 1, 'More than one history window was requested');
     check(isset($transients[ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE]['windows']['7d']) && count($transients[ArcWind_Init_OneUptime_Dashboard::HISTORY_CACHE]['windows']) === 1, 'Seven-day history was not fetched alone');
-    unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
     ob_start();
     $history_dashboard->render();
     $history_html = ob_get_clean();
     check(strpos($history_html, 'Senaste 7 dagarna: 99.95%') !== false && strpos($history_html, '30 dagar') === false, 'Seven-day uptime was not rendered alone');
     unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
     $responses['overview'] = new WP_Error('network', 'secret-token');
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
     [, $stale_dashboard] = render_pair();
     (new ArcWind_Init_OneUptime_Dashboard())->register_widget();
     check($widget_title === 'Example status', 'Stale status page title was lost');
@@ -185,13 +191,17 @@ try {
         load_fixture('valid');
         global $responses;
         $responses['overview'] = $failure;
+        unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
+        (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
         [, $dashboard] = render_pair();
-        check(strpos($dashboard, 'role="alert"') !== false, 'Overview failure had no safe error');
+        check(strpos($dashboard, 'role="alert"') !== false || strpos($dashboard, 'role="status"') !== false, 'Overview failure had no safe fallback');
         check(strpos($dashboard, 'secret-token') === false, 'Response detail leaked to dashboard');
     }
 
     load_fixture('valid');
     $responses['uptime'] = respond('{bad json');
+    unset($transients[ArcWind_Init_OneUptime_Dashboard::CACHE]);
+    (new ArcWind_Init_OneUptime_Dashboard())->refresh_overview();
     [, $dashboard] = render_pair();
     check(strpos($dashboard, 'Website') !== false, 'Uptime failure broke overview');
 
@@ -199,6 +209,8 @@ try {
     foreach (['incidents', 'announcements', 'scheduled-maintenance-events'] as $endpoint) {
         $responses[$endpoint] = new WP_Error('network', 'secret-token');
     }
+    unset($transients[ArcWind_Init_OneUptime::CACHE]);
+    (new ArcWind_Init_OneUptime())->refresh_messages();
     [$banner, $dashboard] = render_pair();
     check($banner === '' && strpos($dashboard, 'Website') !== false, 'Banner API failure broke a page');
 
@@ -225,6 +237,7 @@ try {
         ['_id' => 'a4', 'title' => 'Old resolved alert', 'currentAlertStateId' => 'resolved', 'monitorId' => 'page-monitor'],
         ['_id' => 'a5', 'title' => 'Alert without description', 'currentAlertStateId' => 'open', 'monitorId' => 'page-monitor'],
     ]]));
+    ArcWind_Init_OneUptime::refresh_alerts();
     [$public_alerts, , $admin_alerts] = render_pair();
     check(strpos($admin_alerts, 'Database alert') !== false && strpos($admin_alerts, 'Group alert') !== false && strpos($admin_alerts, 'Old resolved alert') === false, 'Admin alerts did not filter resolved state or include page groups');
     check(substr_count($admin_alerts, '<details') === 3 && strpos($admin_alerts, '<summary style="cursor:pointer;font-weight:600">Database alert') !== false, 'Alerts are not individually expandable by title');
@@ -252,11 +265,13 @@ try {
     check(count($alert_requests) === 2, 'Admin alerts were not cached');
     unset($transients[ArcWind_Init_OneUptime::ALERT_CACHE]);
     $responses['alert-state'] = respond('{bad json');
+    ArcWind_Init_OneUptime::refresh_alerts();
     [, , $failed_alerts] = render_pair();
     check(strpos($failed_alerts, 'Database alert') === false, 'Malformed alert API response was displayed');
     unset($transients[ArcWind_Init_OneUptime::ALERT_CACHE]);
     $responses['overview'] = respond(json_encode(['statusPageResources' => []]));
     $private_requests_before_empty_page = count($alert_requests);
+    ArcWind_Init_OneUptime::refresh_alerts();
     [, , $empty_page_alerts] = render_pair();
     check(strpos($empty_page_alerts, 'Database alert') === false && count($alert_requests) === $private_requests_before_empty_page, 'Missing page monitors did not fail closed');
     $options['alerts_admin'] = 0;

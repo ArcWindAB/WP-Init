@@ -17,7 +17,7 @@ function wp_safe_remote_get($url, $args) { global $response, $requests; $request
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function wp_remote_retrieve_response_code($value) { return $value['code']; }
 function wp_remote_retrieve_body($value) { return $value['body']; }
-function wp_parse_url($value) { return parse_url($value); }
+function wp_parse_url($value, $component = -1) { return parse_url($value, $component); }
 function esc_html($value) { return htmlspecialchars($value, ENT_QUOTES); }
 function wp_kses_post($value) { return $value; }
 function trailingslashit($value) { return rtrim($value, '/') . '/'; }
@@ -35,6 +35,7 @@ foreach ([
     array_merge($release, ['draft' => true]),
     array_merge($release, ['assets' => [['name' => 'source.zip', 'browser_download_url' => $url]]]),
     array_merge($release, ['assets' => [['name' => 'arcwind-init.zip', 'browser_download_url' => 'http://example.test/plugin.zip']]]),
+    array_merge($release, ['assets' => [['name' => 'arcwind-init.zip', 'browser_download_url' => 'https://github.com/ArcWindAB/WP-Init/releases/download/v1.7.9/arcwind-init.zip']]]),
     ['tag_name' => ['malformed'], 'assets' => []],
 ] as $invalid) check(ArcWind_Init_GitHub_Updater::parse_release($invalid) === [], 'Unsafe release accepted');
 
@@ -65,8 +66,17 @@ mkdir($package_dir);
 file_put_contents($package_dir . '/arcwind-init.php', '<?php /* Version: 1.7.0 */');
 $transients[ArcWind_Init_GitHub_Updater::CACHE_KEY] = ['version' => '1.8.0'];
 check(is_wp_error($updater->fix_directory_name($package_dir, '', null, ['plugin' => 'arcwind-init/arcwind-init.php', 'action' => 'update'])), 'Mismatched update version was accepted');
-$wp_filesystem = new class { public function move($source, $destination, $overwrite) { return true; } };
-check(!is_wp_error($updater->fix_directory_name($package_dir, '', null, ['plugin' => 'arcwind-init/arcwind-init.php', 'action' => 'install'])), 'Manual rollback was rejected');
+$wp_filesystem = new class {
+    public $destination;
+    public function exists($path) { return file_exists($path); }
+    public function move($source, $destination, $overwrite) {
+        $this->destination = $destination;
+        return !$overwrite && dirname($source) === dirname($destination);
+    }
+};
+$renamed = $updater->fix_directory_name($package_dir, '', null, ['plugin' => 'arcwind-init/arcwind-init.php', 'action' => 'install']);
+check(!is_wp_error($renamed) && $renamed === dirname($package_dir) . '/arcwind-init', 'Manual rollback was rejected');
+check($wp_filesystem->destination !== WP_PLUGIN_DIR . '/arcwind-init', 'Package was moved into the live plugin directory before WordPress backup');
 unlink($package_dir . '/arcwind-init.php');
 rmdir($package_dir);
 echo "GitHub updater regression tests passed.\n";

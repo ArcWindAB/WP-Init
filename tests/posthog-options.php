@@ -36,12 +36,13 @@ function check_section_state($html, $section, $state) {
 }
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-settings-trait.php';
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-dashboard-trait.php';
+require_once dirname(__DIR__) . '/includes/class-arcwind-init-feedback-trait.php';
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-posthog-trait.php';
 require_once dirname(__DIR__) . '/includes/class-arcwind-init-tracker.php';
 class ArcWind_Init { const OPTION_KEY = 'arcwind_init_settings'; public static function get_version() { return 'test'; } }
 class ArcWind_Init_Options_Test {
     const OPTION_KEY = 'arcwind_init_settings';
-    use ArcWind_Init_Settings_Trait, ArcWind_Init_Dashboard_Trait, ArcWind_Init_PostHog_Trait;
+    use ArcWind_Init_Settings_Trait, ArcWind_Init_Dashboard_Trait, ArcWind_Init_Feedback_Trait, ArcWind_Init_PostHog_Trait;
 }
 $plugin = new ArcWind_Init_Options_Test();
 $plugin->register_settings();
