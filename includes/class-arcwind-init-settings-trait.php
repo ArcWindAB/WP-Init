@@ -116,7 +116,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_errors',
             __('Felspårning', 'arcwind-init'),
             function () {
-                echo '<p>Skicka plugin-/serverfel som events till PostHog (använder din publika API-nyckel via server-side capture).</p>';
+                echo '<p>Skicka fel från dashboardens PostHog-frågor som händelser till PostHog med projekt-token.</p>';
             },
             'arcwind_init_posthog'
         );
@@ -246,7 +246,7 @@ trait ArcWind_Init_Settings_Trait {
             'arcwind_init_connection' => ['PostHog-anslutning', 'Välj region och ange adresserna för webbtrafik och gränssnitt, projekt-ID och publik projekt-token.', true, ''],
             'arcwind_init_frontend' => ['Webbspårning', 'Välj hur PostHog spårar besök och interaktioner samt hur SDK:n laddas på webbplatsen.', $api_ready && $token_ready, 'Fyll i API-värd och projekt-token ovan för att låsa upp webbspårning.'],
             'arcwind_init_main' => ['Dashboardstatistik', 'Visa statistik i WordPress-admin. Frågor till PostHog använder UI-värden och en personlig API-nyckel.', $project_ready, 'Fyll i projekt-ID ovan för att låsa upp dashboardstatistik.'],
-            'arcwind_init_errors' => ['Felspårning', 'Skicka plugin- och serverfel via API-värden med projekt-token.', $api_ready && $token_ready, 'Fyll i API-värd och projekt-token ovan för att låsa upp felspårning.'],
+            'arcwind_init_errors' => ['Felspårning', 'Skicka fel från dashboardens PostHog-frågor via API-värden med projekt-token.', $api_ready && $token_ready, 'Fyll i API-värd och projekt-token ovan för att låsa upp felspårning.'],
         ];
         echo '<style>#arcwind-posthog-settings tbody[hidden]{display:none}#arcwind-posthog-settings .button-link[disabled]{color:#8c8f94;cursor:not-allowed}#arcwind-posthog-settings th[colspan="2"]{padding-top:18px;border-top:1px solid #dcdcde}#arcwind-posthog-settings th[colspan="2"] .button-link{font-size:16px;font-weight:600;text-decoration:none}#arcwind-posthog-settings .arcwind-section-status{display:inline-flex;vertical-align:middle;margin-left:8px}#arcwind-posthog-settings .arcwind-section-status-active{color:#008a20}#arcwind-posthog-settings .arcwind-section-status-inactive{color:#646970}#arcwind-posthog-settings .arcwind-section-status-error{color:#b26200}</style>';
         echo '<p class="description">Ikonerna visar sparad status: grön bock = aktiv, grått streck = av, orange varning = behöver konfigureras.</p>';
@@ -294,7 +294,7 @@ trait ArcWind_Init_Settings_Trait {
         <select name="<?php echo esc_attr(self::OPTION_KEY); ?>[region]">
             <option value="eu" <?php selected($region, 'eu'); ?>>EU</option>
             <option value="us" <?php selected($region, 'us'); ?>>US</option>
-        </select><p class="description">Väljer standardvärde för UI-värden. Anpassade API-adresser ändras inte automatiskt.</p><?php
+        </select><p class="description">Väljer direkta standardadresser för både <code>api_host</code> och <code>ui_host</code>. Egna adresser ändras inte när du byter region.</p><?php
     }
     public function render_input_api_host()          { $o = $this->options(); ?>
         <input id="arcwind_init_api_host" type="url" class="regular-text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[api_host]" value="<?php echo esc_attr($o['api_host'] ?? ''); ?>" placeholder="https://eu.i.posthog.com" />
@@ -335,7 +335,7 @@ trait ArcWind_Init_Settings_Trait {
         </select><p class="description">Väljer var PostHog laddas på webbplatsen och i admin. Head startar spårningen tidigt; Footer väntar tills sidans innehåll har laddats längre.</p><?php
     }
     public function render_checkbox_enable_error_tracking(){ $o = $this->options(); ?>
-        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_error_tracking]" value="1" <?php checked(!empty($o['enable_error_tracking'])); ?> /> Skicka plugin-fel som events</label><?php
+        <label><input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_error_tracking]" value="1" <?php checked(!empty($o['enable_error_tracking'])); ?> /> Skicka fel från PostHog-statistiken som händelser</label><?php
     }
     public function render_input_error_distinct_id() { $o = $this->options(); ?>
         <input type="text" style="width:260px" name="<?php echo esc_attr(self::OPTION_KEY); ?>[error_distinct_id]" value="<?php echo esc_attr($o['error_distinct_id'] ?? 'arcwind-init:server'); ?>" placeholder="arcwind-init:server" /><?php

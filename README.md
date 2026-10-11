@@ -1,11 +1,11 @@
 # ArcWind Init
 
-ArcWind Init är ett WordPress-plugin för PostHog-spårning och statistik, en feedback-länk och en publik OneUptime-statussida. Varje integration kan konfigureras separat under **Inställningar → ArcWind Init**. Externa tjänster är valfria; deras fel ska inte stoppa WordPress.
+ArcWind Init samlar tre valfria WordPress-integrationer: PostHog-spårning och dashboardstatistik, en länk till ett feedbackformulär samt OneUptime-status med driftinformation, alerts och heartbeat. Varje del ställs in separat under **Inställningar → ArcWind Init**.
 
 ## Krav och installation
 
-- WordPress 6.8 eller senare och PHP 8.2 eller 8.3 är testmatrisen i CI. Den här arbetskopian kör WordPress 7.1.3 med PHP 8.3.6. Äldre kombinationer är inte verifierade.
-- Utgående HTTPS behövs för PostHog, OneUptime, GitHub Releases och heartbeat. En publik OneUptime-statussida kräver ingen API-nyckel.
+- CI testar WordPress 6.8 och den senaste WordPress-versionen med PHP 8.2 och 8.3. Andra kombinationer omfattas inte av testmatrisen.
+- Servern behöver kunna göra utgående HTTPS-anrop för PostHogs statistikfrågor och serverhändelser, OneUptime, heartbeat och GitHub Releases. Den publika OneUptime-statussidan kräver ingen API-nyckel; alerts i admin gör det.
 - Installera den byggda `arcwind-init.zip` via **Tillägg → Lägg till nytt → Ladda upp tillägg**, eller placera mappen `arcwind-init/` under `wp-content/plugins/`. Aktivera sedan tillägget.
 - Efter aktivering: öppna inställningsflikarna och ange bara de integrationer som ska användas. Behåll en fungerande WordPress-backup inför uppgradering.
 
@@ -29,16 +29,16 @@ Release-ZIP-filen ska ha `arcwind-init/` som enda rotmapp, med `arcwind-init.php
 | Registrera sidvisning | på | Skickar `$pageview` när sidan laddas. Avmarkera om sidvisningar redan registreras på annat sätt. |
 | Autocapture | på | Registrerar vanliga klick och formulärhändelser automatiskt. |
 | Laddningsposition | `head` | `head` startar tidigt; `footer` laddar skriptet senare, både i frontend och admin. |
-| Aktivera felspårning | på | Skickar pluginets generiska felhändelser via server-side capture när publik nyckel finns. |
-| Distinct ID för fel | `arcwind-init:server` | ID för dessa serverhändelser. |
+| Aktivera felspårning | på | Skickar fel från dashboardens PostHog Query API-frågor som händelser via serverns `api_host` när projekt-token finns. |
+| Distinct ID för fel | `arcwind-init:server` | ID för de felhändelserna. |
 
 PostHog-inställningarna visas i en gemensam tabell. **PostHog-anslutning** är öppen från början och innehåller region, API-värd, UI-värd, projekt-ID och projekt-token. Webbspårning innehåller även SDK defaults, person profiles och laddningsposition och öppnas när API-värd och projekt-token finns. Dashboardstatistik kräver projekt-ID och felspårning kräver API-värd och projekt-token. Ett låst avsnitt visas grått och kan öppnas direkt när dess fält fyllts i. UI-värden är valfri och används för PostHogs gränssnitt och privata Query API.
 
 Ikoner bredvid avsnitten visar den sparade inställningens status: grön bock betyder aktiv, grått streck betyder av och orange varning betyder att något som behövs saknas. Ikonerna visar konfiguration, inte resultatet av ett anslutningstest.
 
-**Statistik** på WordPress dashboard visas när projekt-ID och personlig API-nyckel finns. Den använder UI-värden eller vald regions HTTPS-adress för PostHogs Query API, visar unika användare och sidvisningar för sju dagar och cachelagrar i tio minuter. API-fel ger tomma värden och kort felcache. Feltexter återger inte API-svar eller nycklar. Manuell cache-rensning finns under Diagnostik.
+**Statistik** på WordPress dashboard visas när projekt-ID och personlig API-nyckel finns. Den använder UI-värden eller vald regions HTTPS-adress för PostHogs Query API, räknar unika `distinct_id` och sidvisningar för de senaste sju dagarna och cachelagrar resultatet i tio minuter. Vid API-fel visas ett streck i stället för ett värde. När felspårning är på skickas dessa Query API-fel som generiska PostHog-händelser. Manuell cache-rensning finns under Diagnostik.
 
-Webbsnippet laddas bara när spårning är aktiverad och den publika nyckeln finns. Inloggade användare identifieras med WordPress-användar-ID och attribut som visningsnamn, användarnamn, roller, administratörsstatus och SHA-256-hash av e-post. Även admin-sidor omfattas. Bedöm därför rättslig grund, information till användare och eventuellt samtycke för er webbplats innan spårningen aktiveras. Pluginet innehåller ingen egen samtyckeshanterare.
+Webbsnippet laddas bara när spårning är aktiverad och projekt-token finns. Det körs både på webbplatsen och i wp-admin. Inloggade användare identifieras med WordPress-användar-ID och attribut som visningsnamn, användarnamn, roller, administratörsstatus och SHA-256-hash av e-post. Pluginet innehåller ingen egen samtyckeshanterare.
 
 JavaScript-API:t `window.ArcWindInit.track(eventName, properties)` och `identify(distinctId, properties)` returnerar `false` om PostHog saknas eller kastar fel. PHP-API:t `ArcWind_Init_Tracker::capture($event, $properties, $distinctId)` returnerar bool och använder ett säkert HTTPS-anrop med begränsad timeout. Exempel:
 
@@ -57,7 +57,7 @@ ArcWind_Init_Tracker::capture('report_generated', ['kind' => 'weekly'], 'example
 | Aktivera feedback | på | Visar feedback-widgeten på WordPress dashboard. |
 | Feedback-UUID | tomt | Alfanumeriskt ID som bygger länken `https://t.arc.vin/s/UUID`. |
 
-Widgeten visas först när feedback är aktiverad och ett giltigt UUID finns. Den öppnar formuläret i en ny flik och bäddar inte in tredjepartsskript på publika sidor. UUID och PostHog-inställningar behålls när andra flikar sparas.
+Feedbackkortet visas på WordPress dashboard när feedback är aktiverad och ett giltigt UUID finns. Det länkar till formuläret i en ny flik och bäddar inte in något formulär på publika sidor. Sparade PostHog- och Feedback-inställningar behålls när andra flikar sparas.
 
 ### OneUptime
 
@@ -65,13 +65,13 @@ Widgeten visas först när feedback är aktiverad och ett giltigt UUID finns. De
 | --- | --- | --- |
 | OneUptime-värd | tomt | HTTPS-basadress, exempelvis `https://oneuptime.example.com/`. |
 | Statussidans ID | tomt | ID för den publika statussidan. Statussidans adress byggs som `<värd>/status-page/<ID>`. |
-| Driftinformation på webbplatsen | på | Visar valda händelser i en banner. Kräver värd och status-ID. |
+| Driftinformation på webbplatsen | på | Visar valda händelser i en banner när värd och status-ID finns. |
 | Incidenter, meddelanden, underhåll på webbplatsen | på | Tre separata val för webbplatsen. |
-| Driftinformation i admin | på | Visar valda händelser som WordPress-notiser. Kräver värd och status-ID. |
+| Driftinformation i admin | på | Visar valda händelser som WordPress-notiser när värd och status-ID finns. |
 | Incidenter, meddelanden, underhåll i admin | på | Tre separata val för admin. |
 | Skicka heartbeat | av | Schemalägger heartbeat när värd och heartbeat-ID finns. |
 | Heartbeat-ID | tomt | ID från en Incoming Request-monitor. En fullständig URL av formen `<värd>/heartbeat/<ID>` kan klistras in och kortas till ID:t i fältet. |
-| API-nyckel för alerts | tomt | Nyckel med läsbehörighet för Alert och Alert State. Efter sparning visas en knapp som sparar formuläret och tar bort nyckeln. Inmatningsfältet visas igen när nyckeln har tagits bort. |
+| API-nyckel för alerts | tomt | Nyckel med läsbehörighet för Alert och Alert State. En sparad nyckel visas inte i formuläret; en knapp kan spara formuläret och ta bort nyckeln. |
 | Visa alerts i admin | av | Visar högst tio olösta alerts från statussidans monitorer i en adminnotis för administratörer. Klicka på en titel för att läsa beskrivningen. |
 
 Statussida, Driftinformation, Heartbeat och Alerts finns som öppningsbara avsnitt i samma inställningstabell. Heartbeat är låst tills OneUptime-värden har fyllts i. Driftinformation och Alerts är låsta tills både värd och status-ID har fyllts i. Äldre sparade URL:er och visningsval läses in automatiskt.
@@ -82,7 +82,7 @@ OneUptime-data hämtas från statussidans publika API. Bannern visar högst tio 
 
 Alerts hämtas separat från OneUptimes autentiserade API med den sparade nyckeln. Pluginet läser monitorerna direkt från den konfigurerade statussidan, inklusive monitorer i sidans monitorgrupper, och visar bara deras olösta alerts. Om monitorerna inte kan läsas visas inga alerts. Resultatet cachas i en minut. Alerts visas aldrig i den publika bannern.
 
-Dashboard-widgeten får statussidans eget namn som rubrik. Övergripande status syns direkt; komponenter och nästlade grupper öppnas vid behov, medan tjänsterna visas som enkla rader. Aktuell status hämtas högst en gång per minut. Drifttid för **de senaste 7 dagarna** hämtas i ett separat WP-Cron-jobb och kan saknas på första sidladdningen. Utebliven drifttid märks **uppgift saknas**. När API:et fallerar backar kontrollen i 60 sekunder; senast kända data kan visas i upp till ett dygn och märks **ej aktuell** med grå statusindikator och tidsstämpel. Den visas aldrig som ny grön status. API-svar utan förväntade fält ignoreras och loggas utan innehåll eller hemliga URL:er.
+Dashboard-widgeten använder statussidans namn som rubrik när API:et kan läsa det; annars visas **Driftstatus**. Övergripande status syns direkt; grupper och nästlade grupper öppnas vid behov, medan tjänsterna visas som enkla rader. Aktuell status cachas i en minut. Drifttid för **de senaste 7 dagarna** hämtas i ett separat WP-Cron-jobb och kan saknas på första sidladdningen. Utebliven drifttid märks **uppgift saknas**. När API:et fallerar väntar widgeten 60 sekunder innan ett nytt försök; senast kända data kan visas i upp till ett dygn och märks **ej aktuell** med grå statusindikator och tidsstämpel. Oväntade API-format hanteras utan att svarskroppar eller URL:er loggas.
 
 ### Heartbeat och WP-Cron
 
@@ -102,7 +102,7 @@ Fliken **Diagnostik** visar aktiverings- och konfigurationsstatus för integrati
 
 ## Uppdateringar från GitHub Releases
 
-Pluginfilen har `Update URI: https://github.com/ArcWindAB/WP-Init`. Uppdateraren använder WordPress standardfilter för tillägg med egen Update URI. Informationsrutan för tillägget visar funktioner, installation, vanliga frågor och publicerade versionsnyheter; grundinformationen finns kvar även när GitHub inte svarar. Uppdateraren godtar endast en publicerad, stabil semantisk version med release-asset `arcwind-init.zip` på rätt GitHub-repo och via HTTPS. API-fel och rate limits cachelagras i 15 minuter. Den aktiverar inte automatiska uppdateringar åt dig: använd WordPress egen **Aktivera automatiska uppdateringar** på sidan Installerade tillägg, om er globala policy tillåter det.
+Pluginfilen har `Update URI: https://github.com/ArcWindAB/WP-Init`. Uppdateraren använder WordPress filter för tillägg med egen Update URI. Informationsrutan för tillägget visar funktioner, installation, vanliga frågor och releasens versionsnyheter; grundinformationen finns kvar även när GitHub inte svarar. Uppdateraren läser den senaste publicerade GitHub-releasen, avvisar utkast och releaser markerade som förhandsversioner och kräver en semantisk versionstagg samt ett HTTPS-asset som heter `arcwind-init.zip` på rätt repo. En uppdatering erbjuds först om versionen är nyare än den installerade. Lyckade svar cachas i en timme; API-fel och rate limits i 15 minuter. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.
 
 Inställningar lagras i WordPress options och överlever filuppdateringar. En felaktig release-asset erbjuds inte som uppdatering; installationspaketet måste innehålla pluginfilen och en giltig versionsheader. Ta backup och använd WordPress återställningsfunktion eller installera föregående ZIP om en uppdatering misslyckas. Läs [CHANGELOG.md](CHANGELOG.md) före release.
 
@@ -113,20 +113,20 @@ python3 scripts/build-release.py --tag v2.0.0
 python3 scripts/build-release.py --validate-only
 ```
 
-Publicera sedan ZIP-filen som `arcwind-init.zip` på en GitHub Release vars tagg matchar versionsheadern. Källkodens GitHub-ZIP räcker inte. CI bygger och kontrollerar samma struktur och sparar ZIP som artifact på taggar. Se [releasechecklistan](docs/RELEASE.md).
+Publicera sedan ZIP-filen som `arcwind-init.zip` på en GitHub Release vars tagg matchar versionsheadern. Källkodens GitHub-ZIP räcker inte. CI validerar en installationsbar ZIP och sparar den som artifact på taggar. Vid publicering av en GitHub Release körs även ett separat arbetsflöde som skapar och laddar upp en ZIP. Se [releasechecklistan](docs/RELEASE.md).
 
 ## Felsökning
 
 | Symtom | Kontroll |
 | --- | --- |
-| PostHog-statistik saknas | Ange HTTPS-värd, Project ID och Personal API Key. Kör anslutningstest under Diagnostik. |
-| JavaScript-events saknas | Aktivera spårning, ange publik API-nyckel och kontrollera webbläsarens nätverkslogg. Samtyckesblockering kan stoppa skriptet. |
+| PostHog-statistik saknas | Ange projekt-ID och personlig API-nyckel. Kontrollera `ui_host` eller vald region och kör anslutningstest under Diagnostik. |
+| JavaScript-händelser saknas | Aktivera spårning, ange projekt-token och kontrollera `api_host` samt webbläsarens nätverkslogg. |
 | Feedback-knapp saknas | Aktivera feedback och spara ett alfanumeriskt UUID. |
 | OneUptime-widget saknas | Ange OneUptime-värd och statussidans ID. Kontrollera att statussidan är publik. |
 | Status visas som äldre data | Kontrollera status-API och serverns utgående HTTPS. Rensa cache under Diagnostik när anslutningen fungerar igen. |
 | Drifttidshistorik saknas | Kontrollera att ID används i stället för domänalias och att WP-Cron körs. |
 | Heartbeat uteblir | Kontrollera giltig publik HTTPS-adress, senaste försök och cron-schema i Diagnostik; använd systemcron vid låg trafik. |
-| Ingen GitHub-uppdatering syns | Publicera en nyare stabil Release med korrekt `arcwind-init.zip`; vänta upp till en timme eller rensa cache. |
+| Ingen GitHub-uppdatering syns | Kontrollera att en nyare, publicerad Release har korrekt `arcwind-init.zip`. Vänta upp till en timme eller rensa cache under Diagnostik. |
 
 ## Utveckling och struktur
 

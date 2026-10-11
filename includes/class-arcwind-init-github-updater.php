@@ -78,20 +78,24 @@ class ArcWind_Init_GitHub_Updater {
             ? '<p>' . wp_kses_post($release['changelog']) . '</p>'
             : '<p>Versionsnyheter finns under <a href="https://github.com/' . self::GITHUB_REPO . '/releases">GitHub Releases</a>.</p>';
         $info->sections      = [
-            'description' => '<p>ArcWind Init samlar tre valfria integrationer i WordPress. Aktivera bara de delar webbplatsen använder.</p>' .
+            'description' => '<p>ArcWind Init samlar PostHog, feedback och OneUptime i WordPress. Varje del kan konfigureras separat under <strong>Inställningar → ArcWind Init</strong>.</p>' .
                 '<ul>' .
-                '<li><strong>PostHog:</strong> Spåra besök och händelser, välj region eller reverse proxy och visa statistik för de senaste sju dagarna på adminpanelen.</li>' .
-                '<li><strong>Feedback:</strong> Ge administratörer en direktlänk till ert feedbackformulär.</li>' .
-                '<li><strong>Driftstatus:</strong> Visa incidenter och planerat underhåll från en publik statussida. Följ tillgänglighet de senaste sju dagarna och övervaka webbplatsen med heartbeat.</li>' .
+                '<li><strong>PostHog:</strong> Spåra sidvisningar och händelser på webbplatsen och i admin. Välj EU/US och eventuell reverse proxy. En separat statistikwidget visar aktiva användare och sidvisningar för de senaste sju dagarna när projekt-ID och personlig API-nyckel finns.</li>' .
+                '<li><strong>Feedback:</strong> Visa en länk till ert feedbackformulär på WordPress dashboard när ett feedback-UUID har angetts.</li>' .
+                '<li><strong>OneUptime / Driftstatus:</strong> Visa incidenter, meddelanden och planerade underhåll på webbplatsen eller i admin. Statuswidgeten visar statussidans namn och drifttid för de senaste sju dagarna. Valfria alerts visas i admin för monitorerna på statussidan; heartbeat skickas via WP-Cron till en Incoming Request-monitor.</li>' .
                 '</ul>' .
-                '<p>Inställningarna finns under <strong>Inställningar → ArcWind Init</strong>. Dashboard-kort visas först när respektive integration är konfigurerad.</p>',
+                '<p>Statistik-, feedback- och statuskort visas först när respektive underlag är konfigurerat. Alerts kräver en OneUptime API-nyckel och visas bara för administratörer.</p>',
             'installation' => '<ol>' .
-                '<li>Installera pluginets release-ZIP och aktivera ArcWind Init.</li>' .
-                '<li>Öppna <strong>Inställningar → ArcWind Init</strong> och konfigurera PostHog, Feedback eller statussidan efter behov.</li>' .
-                '<li>Kontrollera anslutningarna på fliken <strong>Diagnostik</strong>.</li>' .
-                '</ol><p>Pluginet uppdateras från GitHub Releases. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.</p>',
-            'faq' => '<h3>Måste alla integrationer konfigureras?</h3><p>Nej. Varje integration kan användas separat. Okonfigurerade statistik- och feedbackkort visas inte.</p>' .
-                '<h3>Vad händer om en extern tjänst är nere?</h3><p>WordPress fortsätter fungera. Statuskortet kan visa senast kända data, tydligt märkta som inaktuella.</p>' .
+                '<li>Installera ZIP-filen <code>arcwind-init.zip</code> från en GitHub Release och aktivera tillägget.</li>' .
+                '<li>Öppna <strong>Inställningar → ArcWind Init</strong>. Fyll i bara de integrationer du vill använda.</li>' .
+                '<li>För PostHog: ange projekt-token för spårning. Lägg till projekt-ID och personlig API-nyckel om du vill visa dashboardstatistik.</li>' .
+                '<li>För OneUptime: ange värd och statussidans ID. Skapa en Incoming Request-monitor om du vill skicka heartbeat.</li>' .
+                '<li>Kontrollera status och testa anslutningarna på fliken <strong>Diagnostik</strong>.</li>' .
+                '</ol><p>Tillägget söker uppdateringar bland publicerade GitHub Releases. WordPress automatiska uppdateringar kan aktiveras på sidan Installerade tillägg.</p>',
+            'faq' => '<h3>Behöver jag konfigurera alla tre delar?</h3><p>Nej. Statistik- och feedbackkort visas när deras egna uppgifter finns; OneUptimes statuskort kräver värd och status-ID.</p>' .
+                '<h3>Vilken PostHog-adress används?</h3><p><code>api_host</code> används för webbspårning och serverhändelser. <code>ui_host</code>, eller vald regions PostHog-adress, används för privata statistikfrågor.</p>' .
+                '<h3>Behöver OneUptime en API-nyckel?</h3><p>Den publika statussidan och heartbeat kräver ingen API-nyckel. Adminvisning av alerts kräver en nyckel med läsbehörighet för Alert och Alert State.</p>' .
+                '<h3>Vad händer om en extern tjänst är nere?</h3><p>WordPress kan fortfarande laddas. Statuskortet kan visa senast kända data med märkningen ”ej aktuell”, och statistiken kan visa tomma värden.</p>' .
                 '<h3>Var finns mer dokumentation?</h3><p>Se <a href="https://github.com/' . self::GITHUB_REPO . '#readme">projektets README på GitHub</a>.</p>',
             'changelog' => $changelog,
         ];
