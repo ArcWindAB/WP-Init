@@ -113,7 +113,7 @@ Inställningar lagras i WordPress options och överlever filuppdateringar. En fe
 Bygg och validera en release lokalt:
 
 ```sh
-python3 scripts/build-release.py --tag v2.1.0
+python3 scripts/build-release.py --tag v2.1.1
 python3 scripts/build-release.py --validate-only
 ```
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.1.1
+
 - Show the WordPress version in administrator diagnostics.
 
 ## 2.1.0
