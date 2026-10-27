@@ -114,7 +114,7 @@ class ArcWind_Init_Diagnostics {
         echo '<li>OneUptime: ' . esc_html(!empty($oneuptime['enabled']) ? __('aktiv', 'arcwind-init') : __('av', 'arcwind-init')) . '; ' . esc_html(!empty($oneuptime['status_url']) && !empty($oneuptime['status_page_id']) ? __('statussida konfigurerad', 'arcwind-init') : __('statussida saknas', 'arcwind-init')) . '.</li>';
         echo '<li>Heartbeat: ' . esc_html(!empty($oneuptime['heartbeat_enabled']) ? __('aktiv', 'arcwind-init') : __('av', 'arcwind-init')) . '; ' . esc_html(!empty($oneuptime['heartbeat_url']) ? __('ID sparat', 'arcwind-init') : __('ID saknas', 'arcwind-init')) . '.</li>';
         echo '<li>OneUptime-alerts: ' . esc_html(!empty($oneuptime['alerts_admin']) ? __('visning i admin aktiv', 'arcwind-init') : __('visning i admin av', 'arcwind-init')) . '; ' . esc_html(!empty($oneuptime['alerts_api_key']) ? __('API-nyckel sparad', 'arcwind-init') : __('API-nyckel saknas', 'arcwind-init')) . '.</li>';
-        echo '<li>PHP: ' . esc_html(PHP_VERSION) . '; ' . esc_html__('plugin:', 'arcwind-init') . ' ' . esc_html(ArcWind_Init::get_version()) . '.</li>';
+        echo '<li>PHP: ' . esc_html(PHP_VERSION) . '; ' . esc_html__('WordPress:', 'arcwind-init') . ' ' . esc_html(get_bloginfo('version')) . '; ' . esc_html__('plugin:', 'arcwind-init') . ' ' . esc_html(ArcWind_Init::get_version()) . '.</li>';
         $next = wp_next_scheduled(ArcWind_Init_OneUptime::HOOK);
         if ($next) {
             echo '<li>' . esc_html__('Nästa heartbeat:', 'arcwind-init') . ' ' . esc_html(wp_date('Y-m-d H:i:s', $next)) . '.</li>';

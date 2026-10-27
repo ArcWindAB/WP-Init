@@ -178,6 +178,7 @@ try {
     ob_start();
     (new ArcWind_Init_Diagnostics())->render();
     $diagnostics_html = ob_get_clean();
+    arcwind_smoke_check(strpos($diagnostics_html, 'WordPress: ' . esc_html(get_bloginfo('version'))) !== false, 'Diagnostics did not show the WordPress version');
     arcwind_smoke_check(strpos($diagnostics_html, 'id="arcwind-error-log"') !== false && strpos($diagnostics_html, '<details>') !== false &&
         strpos($diagnostics_html, 'secret-response-text') === false, 'Administrator log view was missing or exposed a secret');
     $admin_id = get_current_user_id();

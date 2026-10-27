@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show the WordPress version in administrator diagnostics.
+
 ## 2.1.0
 
 - Add a bounded administrator-only diagnostic error log with safe error categories, suggested actions, filters, deduplication, recovery entries, and confirmed clearing.
