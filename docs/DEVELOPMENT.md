@@ -15,6 +15,7 @@ composer install
 find arcwind-init.php includes tests -name '*.php' -print0 | xargs -0 -n1 php -l
 composer cs
 composer analyse
+php tests/nexus-inventory.php
 php tests/oneuptime-dates.php
 php tests/oneuptime-responses.php
 php tests/oneuptime-heartbeat.php
@@ -45,3 +46,12 @@ In the PHP 8.3/latest WordPress job, `tests/wp-module-failure.sh` also removes o
 - Add or update a fixture when a remote response format changes. Check that saving one settings tab retains the other integrations' options.
 
 Follow [RELEASE.md](RELEASE.md) for a release. See the root [AGENTS.md](../AGENTS.md) for language, security, and accessibility rules.
+
+## Nexus inventory reporting
+
+See [the reporter contract and deployment boundary](integrations/nexus-inventory.md).
+`tests/nexus-inventory.php` uses synthetic inventory and fake HTTP responses only.
+The module must remain inactive without a valid external enrollment file. New option
+keys and cron hooks are independent of existing settings/heartbeat. The installable
+ZIP and optional-module failure probe include the new module. Do not mount a real
+reporting credential or contact a production Nexus instance during verification.

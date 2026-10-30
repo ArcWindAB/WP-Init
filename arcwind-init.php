@@ -26,6 +26,13 @@ function arcwind_init_load_module($filename) {
     }
 }
 
+arcwind_init_load_module('class-arcwind-init-nexus-inventory.php');
+if (class_exists('ArcWind_Init_Nexus_Inventory')) {
+    new ArcWind_Init_Nexus_Inventory();
+    register_deactivation_hook(__FILE__, ['ArcWind_Init_Nexus_Inventory', 'deactivate']);
+    register_uninstall_hook(__FILE__, ['ArcWind_Init_Nexus_Inventory', 'uninstall']);
+}
+
 arcwind_init_load_module('class-arcwind-init-error-log.php');
 arcwind_init_load_module('class-arcwind-init-tracker.php');
 arcwind_init_load_module('class-arcwind-init-oneuptime.php');
