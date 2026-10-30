@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Nexus inventory reporting
+
+- Add an independent, disabled technical inventory reporter for Nexus contract v1.
+  External deployment enrollment/credentials, clone-address checks, full installed
+  plugin/theme snapshots, known update-cache timestamps and strict request bounds
+  preserve existing integration settings and heartbeat behavior.
+- Add durable report UUID/body retries, monotonic sequences, bounded background work,
+  credential/enrollment review states and synthetic regression/compatibility checks.
+- No release, production activation, remote updates or personal-data collection change.
+
 ## Unreleased
 
 ## 2.1.1

@@ -8,7 +8,7 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MAIN = ROOT / "arcwind-init.php"
 VERSION_RE = re.compile(r"^\s*\* Version:\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)", re.M)
-REQUIRED = {"arcwind-init.php", "includes/class-arcwind-init-tracker.php",
+REQUIRED = {"arcwind-init.php", "includes/class-arcwind-init-nexus-inventory.php", "includes/class-arcwind-init-tracker.php",
             "includes/class-arcwind-init-error-log.php",
             "includes/class-arcwind-init-oneuptime.php",
             "includes/class-arcwind-init-oneuptime-dashboard.php",

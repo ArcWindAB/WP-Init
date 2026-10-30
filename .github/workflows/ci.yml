@@ -36,6 +36,7 @@ jobs:
           find arcwind-init.php includes tests -name '*.php' -print0 | xargs -0 -n1 php -l
           composer cs
           composer analyse
+          php tests/nexus-inventory.php
           php tests/oneuptime-dates.php
           php tests/oneuptime-responses.php
           php tests/oneuptime-heartbeat.php

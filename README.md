@@ -1,5 +1,10 @@
 # ArcWind Init
 
+The disabled [Nexus technical inventory reporter](docs/integrations/nexus-inventory.md)
+adds operator-enrolled full software snapshots through a separate background module.
+Enrollment and credentials stay in an external deployment secret, outside database
+clones. This source increment does not activate reporting or publish a release.
+
 ArcWind Init samlar tre valfria WordPress-integrationer: PostHog-spårning och dashboardstatistik, en länk till ett feedbackformulär samt OneUptime-status med driftinformation, alerts och heartbeat. Varje del ställs in separat under **Inställningar → ArcWind Init**.
 
 ## Krav och installation
